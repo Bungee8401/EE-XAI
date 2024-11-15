@@ -1,5 +1,3 @@
-# prompt: vgg16 untrained model, train with cifar10, use pytorch
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -8,51 +6,162 @@ import torchvision.transforms as transforms
 from torchvision.models import vgg16
 import matplotlib.pyplot as plt
 import numpy as np
+from multiprocessing import freeze_support
+import pickle
 
-# Check for GPU availability
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Define transforms for data augmentation and normalization
-transform_train = transforms.Compose([
-    transforms.RandomCrop(32, padding=4),
-    transforms.RandomHorizontalFlip(),
-    transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-])
+def main():
+    # Check for GPU availability
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-transform_test = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-])
+    # Define transforms for data augmentation and normalization
+    transform_train = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    ])
 
-# Load CIFAR-10 dataset
-trainset = torchvision.datasets.CIFAR10(root='D:\Study\Module\Master Thesis\dataset\CIFAR10', train=True, download=True, transform=transform_train)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=2)
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    ])
 
-testset = torchvision.datasets.CIFAR10(root='D:\Study\Module\Master Thesis\dataset\CIFAR10', train=False, download=True, transform=transform_test)
-testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=2)
+    # Load CIFAR-10 dataset
+    trainset = torchvision.datasets.CIFAR10(root='D:\Study\Module\Master Thesis\dataset\CIFAR10', train=True, download=True, transform=transform_train)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True, num_workers=2)
 
-classes = ('plane', 'car', 'bird', 'cat',
-           'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+    testset = torchvision.datasets.CIFAR10(root='D:\Study\Module\Master Thesis\dataset\CIFAR10', train=False, download=True, transform=transform_test)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=2)
 
-batch_size = 4
+    # Create VGG16 model with pretrained=False to initialize without weights
+    model = vgg16(pretrained=False)
 
-# Get some random training images
-dataiter = iter(trainloader)
-images, labels = next(dataiter)
+    # Modify the final fully connected layer to match CIFAR-10's 10 classes
+    num_ftrs = model.classifier[6].in_features
+    model.classifier[6] = nn.Linear(num_ftrs, 10)
 
-# Move images and labels to the GPU
-images, labels = images.to(device), labels.to(device)
+    # Move the model to the device (GPU or CPU)
+    model = model.to(device)
 
-# Show images
-def imshow(img):
-    img = img / 2 + 0.5  # unnormalize
-    npimg = img.cpu().numpy()  # move to CPU before converting to numpy
-    plt.imshow(np.transpose(npimg, (1, 2, 0)))
+    # Define loss function and optimizer
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+
+    # Lists to store train and validation losses
+    train_losses = []
+    val_losses = []
+    train_accuracies = []
+    val_accuracies = []
+    total_train = 0
+    correct_train = 0
+
+    # Early stopping parameters
+    patience = 10  # Number of epochs to wait for improvement
+    min_delta = 0.0001  # Minimum change in validation loss to be considered an improvement
+    best_loss = float('inf')  # Initialize with a large value
+    counter = 0  # Counter for epochs without improvement
+    stop_epoch = 0  # Epoch at which training should stop
+
+    # Training loop
+    num_epochs = 100
+    for epoch in range(num_epochs):
+        running_loss = 0.0
+        for i, data in enumerate(trainloader, 0):
+            inputs, labels = data[0].to(device), data[1].to(device)
+
+            optimizer.zero_grad()
+
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            running_loss += loss.item()
+
+            # Calculate training accuracy for this batch
+            _, predicted = torch.max(outputs.data, 1)
+            total_train += labels.size(0)
+            correct_train += (predicted == labels).sum().item()
+
+        epoch_loss = running_loss / len(trainloader)
+        train_losses.append(epoch_loss)
+        train_accuracy = 100 * correct_train / total_train
+        train_accuracies.append(train_accuracy)
+
+        # Validation
+        val_loss = 0.0
+        correct_val = 0
+        total_val = 0
+        with torch.no_grad():
+            for data in testloader:
+                images, labels = data[0].to(device), data[1].to(device)
+                outputs = model(images)
+                loss = criterion(outputs, labels)
+                val_loss += loss.item()
+
+                _, predicted = torch.max(outputs.data, 1)
+                total_val += labels.size(0)
+                correct_val += (predicted == labels).sum().item()
+
+        val_loss /= len(testloader)
+        val_losses.append(val_loss)
+        val_accuracy = 100 * correct_val / total_val
+        val_accuracies.append(val_accuracy)
+
+        print(f"Epoch [{epoch + 1}/{num_epochs}], Train Loss: {epoch_loss:.4f}, Val Loss: {val_loss:.4f}")
+
+        # Early stopping check
+        if val_loss < best_loss - min_delta:
+            best_loss = val_loss
+            counter = 0
+            # Save the best model
+            torch.save(model.state_dict(), 'D:/Study/Module/Master Thesis/trained_models/vgg16_cifar10_early_stop.pth')
+        else:
+            counter += 1
+            if counter >= patience:
+                print(f"Early stopping at epoch {epoch + 1}")
+                stop_epoch = epoch
+                break
+
+    # store plotting values:
+    with open('D:/Study/Module/Master Thesis/trained_models/vgg16_loss.json', 'w') as f:
+        pickle.dump({
+            'train_losses': train_losses,
+            'val_losses': val_losses,
+            'train_accuracies': train_accuracies,
+            'val_accuracies': val_accuracies
+        }, f)
+
+    # Save the trained model
+    torch.save(model.state_dict(), 'D:/Study/Module/Master Thesis/trained_models/vgg16_cifar10.pth')
+
+    # Plotting the losses
+    plt.figure(figsize=(12, 5))
+
+    plt.subplot(1, 2, 1)
+    plt.plot(range(1, stop_epoch + 1), train_losses, label='Train Loss')
+    plt.plot(range(1, stop_epoch + 1), val_losses, label='Validation Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training and Validation Losses')
+    plt.legend()
+
+    plt.subplot(1, 2, 2)
+    plt.plot(range(1, stop_epoch + 1), train_accuracies, label='Train Accuracy')
+    plt.plot(range(1, stop_epoch + 1), val_accuracies, label='Validation Accuracy')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title('Train and Validation Accuracy')
+    plt.legend()
+
+    plt.tight_layout()
     plt.show()
 
-# Print labels
-print(' '.join('%5s' % classes[labels[j]] for j in range(batch_size)))
+    print('Finished Training')
 
-# Show all images in the batch
-imshow(torchvision.utils.make_grid(images[:batch_size]))  # move to CPU before showing
+
+
+if __name__ == '__main__':
+    freeze_support()
+    main()
