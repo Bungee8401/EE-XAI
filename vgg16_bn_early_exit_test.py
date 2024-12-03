@@ -180,11 +180,14 @@ def main():
     print('Finished Training')
 
     # Save the trained model
-    torch.save(model.state_dict(), 'D:/Study/Module/Master Thesis/trained_models/vgg16_bn_cifar10.pth')
+    torch.save(model.state_dict(), 'D:/Study/Module/Master Thesis/trained_models/vgg16_bn_branches_cifar10.pth')
 
     # Save training and validation losses
-    with open('D:/Study/Module/Master Thesis/trained_models/losses.json', 'w') as f:
-        json.dump({'train_losses': train_losses, 'val_losses': val_losses}, f)
+    with open('D:/Study/Module/Master Thesis/trained_models/vgg6bn_branches_loss.json', 'w') as f:
+        json.dump({
+            'train_losses': train_losses,
+            'val_losses': val_losses
+        }, f)
 
     # Plot training and validation loss
 

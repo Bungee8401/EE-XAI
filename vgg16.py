@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from multiprocessing import freeze_support
 import pickle
-
+import sys
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 def main():
     # Check for GPU availability
@@ -18,35 +19,33 @@ def main():
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(degrees=15),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
 
     transform_test = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
 
     # Load CIFAR-10 dataset
     trainset = torchvision.datasets.CIFAR10(root='D:\Study\Module\Master Thesis\dataset\CIFAR10', train=True, download=True, transform=transform_train)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True, num_workers=2)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=32, shuffle=True, num_workers=2)
 
     testset = torchvision.datasets.CIFAR10(root='D:\Study\Module\Master Thesis\dataset\CIFAR10', train=False, download=True, transform=transform_test)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=2)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=256, shuffle=False, num_workers=2)
 
     # Create VGG16 model with pretrained=False to initialize without weights
-    model = vgg16(pretrained=False)
-
+    model = vgg16(weights=None)
+    print(model)
     # Modify the final fully connected layer to match CIFAR-10's 10 classes
     num_ftrs = model.classifier[6].in_features
     model.classifier[6] = nn.Linear(num_ftrs, 10)
-
+    print(model)
     # Move the model to the device (GPU or CPU)
     model = model.to(device)
-
-    # Define loss function and optimizer
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
     # Lists to store train and validation losses
     train_losses = []
@@ -55,16 +54,17 @@ def main():
     val_accuracies = []
     total_train = 0
     correct_train = 0
+    num_epochs = 150
+    learning_rate = 0.001
 
-    # Early stopping parameters
-    patience = 10  # Number of epochs to wait for improvement
-    min_delta = 0.0001  # Minimum change in validation loss to be considered an improvement
-    best_loss = float('inf')  # Initialize with a large value
-    counter = 0  # Counter for epochs without improvement
-    stop_epoch = 0  # Epoch at which training should stop
+    # Define loss function and optimizer
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
+
+    # Define the learning rate scheduler
+    scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs)
 
     # Training loop
-    num_epochs = 100
     for epoch in range(num_epochs):
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
@@ -104,52 +104,35 @@ def main():
                 total_val += labels.size(0)
                 correct_val += (predicted == labels).sum().item()
 
+        scheduler.step()
+
         val_loss /= len(testloader)
         val_losses.append(val_loss)
         val_accuracy = 100 * correct_val / total_val
         val_accuracies.append(val_accuracy)
 
         print(f"Epoch [{epoch + 1}/{num_epochs}], Train Loss: {epoch_loss:.4f}, Val Loss: {val_loss:.4f}")
-
-        # Early stopping check
-        if val_loss < best_loss - min_delta:
-            best_loss = val_loss
-            counter = 0
-            # Save the best model
-            torch.save(model.state_dict(), 'D:/Study/Module/Master Thesis/trained_models/vgg16_cifar10_early_stop.pth')
-        else:
-            counter += 1
-            if counter >= patience:
-                print(f"Early stopping at epoch {epoch + 1}")
-                stop_epoch = epoch
-                break
-
-    # store plotting values:
-    with open('D:/Study/Module/Master Thesis/trained_models/vgg16_loss.json', 'w') as f:
-        pickle.dump({
-            'train_losses': train_losses,
-            'val_losses': val_losses,
-            'train_accuracies': train_accuracies,
-            'val_accuracies': val_accuracies
-        }, f)
+        print(f"Epoch [{epoch + 1}/{num_epochs}], Train Accuracy: {train_accuracy:.2f}%, Val Accuracy: {val_accuracy:.2f}%")
 
     # Save the trained model
     torch.save(model.state_dict(), 'D:/Study/Module/Master Thesis/trained_models/vgg16_cifar10.pth')
 
     # Plotting the losses
+    epoch = range(1, len(train_losses) + 1)
+
     plt.figure(figsize=(12, 5))
 
     plt.subplot(1, 2, 1)
-    plt.plot(range(1, stop_epoch + 1), train_losses, label='Train Loss')
-    plt.plot(range(1, stop_epoch + 1), val_losses, label='Validation Loss')
+    plt.plot(epoch, train_losses, label='Train Loss')
+    plt.plot(epoch, val_losses, label='Validation Loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.title('Training and Validation Losses')
     plt.legend()
 
     plt.subplot(1, 2, 2)
-    plt.plot(range(1, stop_epoch + 1), train_accuracies, label='Train Accuracy')
-    plt.plot(range(1, stop_epoch + 1), val_accuracies, label='Validation Accuracy')
+    plt.plot(epoch, train_accuracies, label='Train Accuracy')
+    plt.plot(epoch, val_accuracies, label='Validation Accuracy')
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy')
     plt.title('Train and Validation Accuracy')
