@@ -110,6 +110,29 @@ class BranchedAlexNet(nn.Module):
 
         return out_main, out_branch1, out_branch2, out_branch3, out_branch4, out_branch5
 
+    def extract_features(self, x):
+        x = self.conv1(x)
+        x = self.relu1(x)
+        x = self.pool1(x)
+
+        x = self.conv2(x)
+        x = self.relu2(x)
+        x = self.pool2(x)
+
+        x = self.conv3(x)
+        x = self.relu3(x)
+
+        x = self.conv4(x)
+        x = self.relu4(x)
+
+        x = self.conv5(x)
+        x = self.relu5(x)
+        x = self.pool5(x)
+
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        return x
+
 def main():
     # Check for GPU availability
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

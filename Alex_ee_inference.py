@@ -7,6 +7,8 @@ from torchvision.models import alexnet
 import matplotlib.pyplot as plt
 from Alexnet_early_exit import BranchedAlexNet
 from torch.utils.tensorboard import SummaryWriter
+import os
+import time
 
 # seed for reproducibility
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -18,6 +20,17 @@ if device.type == 'cuda':
 model = BranchedAlexNet(num_classes=10).to(device)
 model.load_state_dict(torch.load(r"D:\Study\Module\Master Thesis\trained_models\B-Alex lr=0.001 transfer learning\B-Alex_cifar10_epoch_30.pth",
                                  weights_only=True))
+
+def save_right_image(image, label, predicted, exit_name, cnt):
+    class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+    os.makedirs(f'Alex_thresh_right/{exit_name}', exist_ok=True)
+    torchvision.utils.save_image(image, f'Alex_thresh_right/{exit_name}/{class_names[label]}_{class_names[predicted]}_{cnt}.png')
+
+def save_wrong_image(image, label, predicted, exit_name, cnt):
+    class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+    # label_folder = class_names[label]
+    os.makedirs(f'Alex_thresh_wrong/{exit_name}', exist_ok=True)
+    torchvision.utils.save_image(image, f'Alex_thresh_wrong/{exit_name}/{class_names[label]}_{class_names[predicted]}_{cnt}.png')
 
 def simple_inference(model, dataloader):
     model.eval()
@@ -101,6 +114,7 @@ def threshold_inference(model, dataloader, exit_thresholds):
     correct_exit5 = 0
     total = 0
     exit_counts = [0, 0, 0, 0, 0, 0]  # [exit1-5, main]
+    cnt = 0
 
     # entropy-based criteria as in BranchyNet; in cifar10, max entropy is 2.3; smaller entropy, more confident
     with torch.no_grad():
@@ -131,28 +145,59 @@ def threshold_inference(model, dataloader, exit_thresholds):
             for i in range(labels.size(0)):
                 if entropy_exit1[i] < exit_thresholds[0]:
                     _, predicted = torch.max(exit1_out[i].data, 0)
-                    correct_exit1 += (predicted == labels[i]).item()
                     exit_counts[0] += 1
+                    if predicted == labels[i]:
+                        correct_exit1 += 1
+
+                        save_right_image(images[i], labels[i], predicted, 'exit1', cnt)
+                    else:
+                        save_wrong_image(images[i], labels[i], predicted, 'exit1', cnt)
                 elif entropy_exit2[i] < exit_thresholds[1]:
                     _, predicted = torch.max(exit2_out[i].data, 0)
-                    correct_exit2 += (predicted == labels[i]).item()
                     exit_counts[1] += 1
+                    if predicted == labels[i]:
+                        correct_exit2 += (predicted == labels[i]).item()
+
+                        save_right_image(images[i], labels[i], predicted, 'exit2', cnt)
+                    else:
+                        save_wrong_image(images[i], labels[i], predicted, 'exit2', cnt)
                 elif entropy_exit3[i] < exit_thresholds[2]:
                     _, predicted = torch.max(exit3_out[i].data, 0)
-                    correct_exit3 += (predicted == labels[i]).item()
                     exit_counts[2] += 1
+                    if predicted == labels[i]:
+                        correct_exit3 += (predicted == labels[i]).item()
+
+                        save_right_image(images[i], labels[i], predicted, 'exit3', cnt)
+                    else:
+                        save_wrong_image(images[i], labels[i], predicted, 'exit3', cnt)
                 elif entropy_exit4[i] < exit_thresholds[3]:
                     _, predicted = torch.max(exit4_out[i].data, 0)
-                    correct_exit4 += (predicted == labels[i]).item()
                     exit_counts[3] += 1
+                    if predicted == labels[i]:
+                        correct_exit4 += (predicted == labels[i]).item()
+
+                        save_right_image(images[i], labels[i], predicted, 'exit4', cnt)
+                    else:
+                        save_wrong_image(images[i], labels[i], predicted, 'exit4', cnt)
                 elif entropy_exit5[i] < exit_thresholds[4]:
                     _, predicted = torch.max(exit5_out[i].data, 0)
-                    correct_exit5 += (predicted == labels[i]).item()
                     exit_counts[4] += 1
+                    if predicted == labels[i]:
+                        correct_exit5 += (predicted == labels[i]).item()
+
+                        save_right_image(images[i], labels[i], predicted, 'exit5', cnt)
+                    else:
+                        save_wrong_image(images[i], labels[i], predicted, 'exit5', cnt)
                 else:
                     _, predicted = torch.max(main_out[i].data, 0)
-                    correct_main += (predicted == labels[i]).item()
                     exit_counts[5] += 1
+                    if predicted == labels[i]:
+                        correct_main += (predicted == labels[i]).item()
+
+                        save_right_image(images[i], labels[i], predicted, 'main', cnt)
+                    else:
+                        save_wrong_image(images[i], labels[i], predicted, 'main', cnt)
+                cnt += 1
 
     # Calculate accuracy and exit ratios
     exit1_accuracy = 100 * correct_exit1 / exit_counts[0] if exit_counts[0] > 0 else 0
@@ -165,63 +210,6 @@ def threshold_inference(model, dataloader, exit_thresholds):
     exit_ratios = [100 * count / total for count in exit_counts]
 
     return [exit1_accuracy, exit2_accuracy, exit3_accuracy, exit4_accuracy, exit5_accuracy, main_accuracy], exit_ratios
-
-def _exit_point_datasets(model, dataloader, exit_thresholds, base_dir): # TODO: need test
-    import os
-    import torch.utils.data
-
-    model.eval()
-    exit_datasets = [[] for _ in range(6)]  # 6 datasets for 5 exits and main
-
-    with torch.no_grad():
-        for data in dataloader:
-            images, labels = data[0].to(device), data[1].to(device)
-
-            # Forward pass
-            main_out, exit1_out, exit2_out, exit3_out, exit4_out, exit5_out = model(images)
-
-            # Calculate softmax and entropy for exit1-5
-            softmax_exit1 = F.softmax(exit1_out, dim=1)
-            entropy_exit1 = -torch.sum(softmax_exit1 * torch.log(softmax_exit1 + 1e-5), dim=1)
-
-            softmax_exit2 = F.softmax(exit2_out, dim=1)
-            entropy_exit2 = -torch.sum(softmax_exit2 * torch.log(softmax_exit2 + 1e-5), dim=1)
-
-            softmax_exit3 = F.softmax(exit3_out, dim=1)
-            entropy_exit3 = -torch.sum(softmax_exit3 * torch.log(softmax_exit3 + 1e-5), dim=1)
-
-            softmax_exit4 = F.softmax(exit4_out, dim=1)
-            entropy_exit4 = -torch.sum(softmax_exit4 * torch.log(softmax_exit4 + 1e-5), dim=1)
-
-            softmax_exit5 = F.softmax(exit5_out, dim=1)
-            entropy_exit5 = -torch.sum(softmax_exit5 * torch.log(softmax_exit5 + 1e-5), dim=1)
-
-            # Determine exit points based on thresholds
-            for i in range(labels.size(0)):
-                if entropy_exit1[i] < exit_thresholds[0]:
-                    exit_datasets[0].append((images[i].cpu(), labels[i].cpu()))
-                elif entropy_exit2[i] < exit_thresholds[1]:
-                    exit_datasets[1].append((images[i].cpu(), labels[i].cpu()))
-                elif entropy_exit3[i] < exit_thresholds[2]:
-                    exit_datasets[2].append((images[i].cpu(), labels[i].cpu()))
-                elif entropy_exit4[i] < exit_thresholds[3]:
-                    exit_datasets[3].append((images[i].cpu(), labels[i].cpu()))
-                elif entropy_exit5[i] < exit_thresholds[4]:
-                    exit_datasets[4].append((images[i].cpu(), labels[i].cpu()))
-                else:
-                    exit_datasets[5].append((images[i].cpu(), labels[i].cpu()))
-
-    # Convert lists to TensorDataset
-    exit_datasets = [
-        torch.utils.data.TensorDataset(torch.stack([x[0] for x in dataset]), torch.stack([x[1] for x in dataset])) for dataset in exit_datasets]
-
-    # Save datasets locally
-    os.makedirs(base_dir, exist_ok=True)
-    for idx, dataset in enumerate(exit_datasets):
-        torch.save(dataset, os.path.join(base_dir, f'exit_dataset_{idx}.pt'))
-
-    print("_exit_point_datasets ready!")
-    pass
 
 if __name__ == '__main__':
 
@@ -245,15 +233,22 @@ if __name__ == '__main__':
 
     print(f"simple_inference accuracy: {initial_accuracy}")
 
-    # accuracy_bounds = [initial_accuracy[i] - 1 for i in range(5)] # allow 1% drop in accuracy
-    optimal_thresholds, best_accuracies, best_exit_ratios = threshold_finder(model, testloader, initial_thresholds,
+    # Dis/enable threshold finder
+    FIND_THRESHOLD = False
+    if FIND_THRESHOLD:
+        # accuracy_bounds = [initial_accuracy[i] - 1 for i in range(5)] # allow 1% drop in accuracy
+        optimal_thresholds, best_accuracies, best_exit_ratios = threshold_finder(model, testloader, initial_thresholds,
                                                                              initial_accuracy, step=0.1,
                                                                              tolerance=10)
-    print("---------------------------------")
-    print(f"threshold_finder Thresholds: {optimal_thresholds}")
-    print(f"threshold_finder Accuracies: {best_accuracies}")
-    print(f"threshold_finder Exit Ratios: {best_exit_ratios}")
+        print("---------------------------------")
+        print(f"threshold_finder Thresholds: {optimal_thresholds}")
+        print(f"threshold_finder Accuracies: {best_accuracies}")
+        print(f"threshold_finder Exit Ratios: {best_exit_ratios}")
+    else:
+        optimal_thresholds = [0.5, 0.6, 0.3, 0.2, 0.2]
+        print(f"optimal Thresholds already found: {optimal_thresholds}")
 
+    # Do threshold inference, also store the wrong imgs locally
     accuracy, exit_ratios = threshold_inference(model, testloader, optimal_thresholds)
 
     print("---------------------------------")
@@ -341,98 +336,3 @@ if __name__ == '__main__':
 # ---------------------------------
 # threshold_inference Accuracy: [92.07660533233195, 92.1351504826803, 92.10526315789474, 91.92307692307692, 93.13725490196079, 62.734584450402146]
 # threshold_inference Exit Ratios: [26.63, 35.22, 14.06, 7.8, 5.1, 11.19]
-
-# TODO: other metrics may need to be added to optimize the threshold?
-#           - if no, can continue to test what kind of changes have biggest impact on acc; flops, params, latency are not the concern here
-#           - so, I need three functions:
-#               + input_transform function
-#                   - have (testloader, ect) as input,
-#                   - (testloader_transformed) as output
-#               + acc_and_exit_ratio function
-#                   - (model, testloader, testloader_transformed) as input
-#                   - (acc, acc_trans, exit_ratio, exit_ratio_trans) as output
-#               + data_split function
-#                   - split data according to class
-#                   - split easy and hard
-#                   - split easy and hard according to class
-
-def image_masking(images, pattern, location): # TODO: try to make locations generated randomly
-    masked_images = images.clone()
-    for loc in location:
-        x, y = loc
-        if pattern == 'checkerboard':
-            for i in range(x, x + 8):
-                for j in range(y, y + 8):
-                    if (i + j) % 2 == 0:
-                        masked_images[:, :, i, j] = 0
-        elif pattern == 'stripe':
-            for i in range(x, x + 8):
-                masked_images[:, :, i, y:y + 8] = 0
-        elif pattern == 'cropping':
-            for i in range(x, x + 8):
-                for j in range(y, y + 8):
-                    masked_images[:, :, 32:32-i, 32:32-j] = 0
-        # Add more patterns as needed
-    return masked_images
-
-def input_transform(testloader, transform_type):
-    transformed_data = []
-
-    for data in testloader:
-        images, labels = data
-        if transform_type == 'color':
-            # Set R, G, B channels to 0
-            images[:, 0, :, :] = 0  # Set Red channel to 0
-            images[:, 1, :, :] = 0  # Set Green channel to 0
-            images[:, 2, :, :] = 0  # Set Blue channel to 0
-        elif transform_type == 'masking':
-            # Apply some masking transformation
-            # mask = torch.ones_like(images)
-            # mask[:, :, 112:, 112:] = 0  # Example mask
-            # images = images * mask
-            images = image_masking(images, "xxx_TYPE_xxx")
-        # Add more transformations
-
-        transformed_data.append((images, labels))
-
-    testloader_transformed = torch.utils.data.DataLoader(transformed_data, batch_size=testloader.batch_size, shuffle=False, num_workers=testloader.num_workers)
-
-    return testloader_transformed
-
-def acc_and_exit_ratio(model, testloader, testloader_transformed):
-    accuracy, exit_ratios = threshold_inference(model, testloader, [1.0] * 5)
-    accuracy_trans, exit_ratios_trans = threshold_inference(model, testloader_transformed, [1.0] * 5)
-
-    return accuracy, accuracy_trans, exit_ratios, exit_ratios_trans
-
-def data_split(dataset, split_type='random'):
-    class_data = {}
-    for data in dataset:
-        images, labels = data
-        for i in range(len(labels)):
-            label = labels[i].item()
-            if label not in class_data:
-                class_data[label] = []
-            class_data[label].append((images[i], label))
-
-    easy_data = []
-    hard_data = []
-
-    if split_type == 'half':
-        for label, data in class_data.items():
-            split_idx = len(data) // 2
-            easy_data.extend(data[:split_idx])
-            hard_data.extend(data[split_idx:])
-        return
-    elif split_type == 'exit_location':
-        exit_location_path = _exit_point_datasets(BranchedAlexNet, testloader, [0.2]*5)
-        exit_datasets = [torch.load(os.path.join(exit_location_path, f'exit_dataset_{i}.pt')) for i in range(6)]
-        return exit_datasets
-    elif split_type == 'easy_hard':
-        for label, data in class_data.items():
-            split_idx = len(data) // 2
-            easy_data.extend(data[:split_idx])
-            hard_data.extend(data[split_idx:])
-        return
-
-    pass
