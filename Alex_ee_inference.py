@@ -1,3 +1,4 @@
+import pytorch_lightning
 import torch
 import torch.nn.functional as F
 import torchvision
@@ -9,17 +10,15 @@ from Alexnet_early_exit import BranchedAlexNet
 from torch.utils.tensorboard import SummaryWriter
 import os
 import time
+from CustomDataset import Data_prep_224_normal_N
 
 # seed for reproducibility
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-if device.type == 'cuda':
-    torch.cuda.manual_seed(2024)
-    torch.cuda.manual_seed_all(2024)
+pytorch_lightning.seed_everything(2024)
 
 # Load the trained model
 model = BranchedAlexNet(num_classes=10).to(device)
-model.load_state_dict(torch.load(r"D:\Study\Module\Master Thesis\trained_models\B-Alex lr=0.001 transfer learning\B-Alex_cifar10_epoch_30.pth",
-                                 weights_only=True))
+model.load_state_dict(torch.load(r"D:\Study\Module\Master Thesis\trained_models\B-Alex final\B-Alex_cifar10.pth", weights_only=True))
 
 def save_right_image(image, label, predicted, exit_name, cnt):
     class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
@@ -149,54 +148,54 @@ def threshold_inference(model, dataloader, exit_thresholds):
                     if predicted == labels[i]:
                         correct_exit1 += 1
 
-                        save_right_image(images[i], labels[i], predicted, 'exit1', cnt)
-                    else:
-                        save_wrong_image(images[i], labels[i], predicted, 'exit1', cnt)
+                        # save_right_image(images[i], labels[i], predicted, 'exit1', cnt)
+                    # else:
+                        # save_wrong_image(images[i], labels[i], predicted, 'exit1', cnt)
                 elif entropy_exit2[i] < exit_thresholds[1]:
                     _, predicted = torch.max(exit2_out[i].data, 0)
                     exit_counts[1] += 1
                     if predicted == labels[i]:
                         correct_exit2 += (predicted == labels[i]).item()
 
-                        save_right_image(images[i], labels[i], predicted, 'exit2', cnt)
-                    else:
-                        save_wrong_image(images[i], labels[i], predicted, 'exit2', cnt)
+                        # save_right_image(images[i], labels[i], predicted, 'exit2', cnt)
+                    # else:
+                        # save_wrong_image(images[i], labels[i], predicted, 'exit2', cnt)
                 elif entropy_exit3[i] < exit_thresholds[2]:
                     _, predicted = torch.max(exit3_out[i].data, 0)
                     exit_counts[2] += 1
                     if predicted == labels[i]:
                         correct_exit3 += (predicted == labels[i]).item()
 
-                        save_right_image(images[i], labels[i], predicted, 'exit3', cnt)
-                    else:
-                        save_wrong_image(images[i], labels[i], predicted, 'exit3', cnt)
+                        # save_right_image(images[i], labels[i], predicted, 'exit3', cnt)
+                    # else:
+                        # save_wrong_image(images[i], labels[i], predicted, 'exit3', cnt)
                 elif entropy_exit4[i] < exit_thresholds[3]:
                     _, predicted = torch.max(exit4_out[i].data, 0)
                     exit_counts[3] += 1
                     if predicted == labels[i]:
                         correct_exit4 += (predicted == labels[i]).item()
 
-                        save_right_image(images[i], labels[i], predicted, 'exit4', cnt)
-                    else:
-                        save_wrong_image(images[i], labels[i], predicted, 'exit4', cnt)
+                        # save_right_image(images[i], labels[i], predicted, 'exit4', cnt)
+                    # else:
+                        # save_wrong_image(images[i], labels[i], predicted, 'exit4', cnt)
                 elif entropy_exit5[i] < exit_thresholds[4]:
                     _, predicted = torch.max(exit5_out[i].data, 0)
                     exit_counts[4] += 1
                     if predicted == labels[i]:
                         correct_exit5 += (predicted == labels[i]).item()
 
-                        save_right_image(images[i], labels[i], predicted, 'exit5', cnt)
-                    else:
-                        save_wrong_image(images[i], labels[i], predicted, 'exit5', cnt)
+                        # save_right_image(images[i], labels[i], predicted, 'exit5', cnt)
+                    # else:
+                        # save_wrong_image(images[i], labels[i], predicted, 'exit5', cnt)
                 else:
                     _, predicted = torch.max(main_out[i].data, 0)
                     exit_counts[5] += 1
                     if predicted == labels[i]:
                         correct_main += (predicted == labels[i]).item()
 
-                        save_right_image(images[i], labels[i], predicted, 'main', cnt)
-                    else:
-                        save_wrong_image(images[i], labels[i], predicted, 'main', cnt)
+                        # save_right_image(images[i], labels[i], predicted, 'main', cnt)
+                    # else:
+                        # save_wrong_image(images[i], labels[i], predicted, 'main', cnt)
                 cnt += 1
 
     # Calculate accuracy and exit ratios
@@ -211,21 +210,76 @@ def threshold_inference(model, dataloader, exit_thresholds):
 
     return [exit1_accuracy, exit2_accuracy, exit3_accuracy, exit4_accuracy, exit5_accuracy, main_accuracy], exit_ratios
 
+def threshold_inference_new(model, category, dataloader, exit_thresholds):
+    model.eval()
+    exit_point = []
+    with torch.no_grad():
+
+            main_out, exit1_out, exit2_out, exit3_out, exit4_out, exit5_out = model(dataloader)
+
+            softmax_exit1 = F.softmax(exit1_out, dim=1)
+            entropy_exit1 = -torch.sum(softmax_exit1 * torch.log(softmax_exit1 + 1e-5), dim=1)
+
+            softmax_exit2 = F.softmax(exit2_out, dim=1)
+            entropy_exit2 = -torch.sum(softmax_exit2 * torch.log(softmax_exit2 + 1e-5), dim=1)
+
+            softmax_exit3 = F.softmax(exit3_out, dim=1)
+            entropy_exit3 = -torch.sum(softmax_exit3 * torch.log(softmax_exit3 + 1e-5), dim=1)
+
+            softmax_exit4 = F.softmax(exit4_out, dim=1)
+            entropy_exit4 = -torch.sum(softmax_exit4 * torch.log(softmax_exit4 + 1e-5), dim=1)
+
+            softmax_exit5 = F.softmax(exit5_out, dim=1)
+            entropy_exit5 = -torch.sum(softmax_exit5 * torch.log(softmax_exit5 + 1e-5), dim=1)
+
+            for i in range(dataloader.size(0)):
+                if entropy_exit1[i] < exit_thresholds[0]:
+                    _, predicted = torch.max(exit1_out.data, 1)
+                    classified_label = predicted
+                    exit_point.append(0)
+                elif entropy_exit2[i] < exit_thresholds[1]:
+                    _, predicted = torch.max(exit2_out.data, 1)
+                    classified_label = predicted
+                    exit_point.append(1)
+                elif entropy_exit3[i] < exit_thresholds[2]:
+                    _, predicted = torch.max(exit3_out.data, 1)
+                    classified_label = predicted
+                    exit_point.append(2)
+                elif entropy_exit4[i] < exit_thresholds[3]:
+                    _, predicted = torch.max(exit4_out.data, 1)
+                    classified_label = predicted
+                    exit_point.append(3)
+                elif entropy_exit5[i] < exit_thresholds[4]:
+                    _, predicted = torch.max(exit5_out.data, 1)
+                    classified_label = predicted
+                    exit_point.append(4)
+                else:
+                    _, predicted = torch.max(main_out.data, 1)
+                    classified_label = predicted
+                    exit_point.append(5)
+
+    return classified_label, exit_point
+
 if __name__ == '__main__':
 
     # Initialize TensorBoard
     log_dir = 'Tensorboard_data/Alex_ee_inference'
     writer = SummaryWriter(log_dir=log_dir)
 
-    transform_test = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    ])
+    # transform_test = transforms.Compose([
+    #     transforms.Resize((224, 224)),
+    #     transforms.ToTensor(),
+    #     # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    # ])
+    #
+    # testset = torchvision.datasets.CIFAR10(root='D:/Study/Module/Master Thesis/dataset/CIFAR10', train=False, download=True, transform=transform_test)
+    # # testset = torchvision.datasets.ImageFolder(root=r'D:\Code\Thesis\Airplane_right\exit5', transform=transform_test)
+    # testloader = torch.utils.data.DataLoader(testset, batch_size=256, shuffle=False, num_workers=2)
 
-    testset = torchvision.datasets.CIFAR10(root='D:/Study/Module/Master Thesis/dataset/CIFAR10', train=False,
-                                           download=True, transform=transform_test)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=256, shuffle=False, num_workers=2)
+    root = 'D:/Study/Module/Master Thesis/dataset/CIFAR10'
+    dataprep = Data_prep_224_normal_N(root)
+    trainloader, valloader, testloader = dataprep.create_loaders(batch_size=100, num_workers=2)
+
 
     initial_thresholds = [1.0] * 5 # max entropy is 2.3 for 10 class problem, but starting at 1.0 is just faster
 
@@ -336,3 +390,17 @@ if __name__ == '__main__':
 # ---------------------------------
 # threshold_inference Accuracy: [92.07660533233195, 92.1351504826803, 92.10526315789474, 91.92307692307692, 93.13725490196079, 62.734584450402146]
 # threshold_inference Exit Ratios: [26.63, 35.22, 14.06, 7.8, 5.1, 11.19]
+
+#  --------------------------------
+# ------ after adding val set ------
+#  --------------------------------
+
+# ---------------------------------------
+# simple_inference accuracy: [63.36, 79.08, 85.85, 89.19, 91.46, 91.77]
+# optimal Thresholds already found: [0.5, 0.6, 0.3, 0.2, 0.2]
+# Seed set to 2024
+# Seed set to 2024
+# ---------------------------------
+# threshold_inference Accuracy: [91.86515207035544, 91.84188393608073, 91.10644257703082, 90.9090909090909, 90.51383399209486, 60.76845298281092]
+# threshold_inference Exit Ratios: [27.29, 35.67, 14.28, 7.81, 5.06, 9.89]
+

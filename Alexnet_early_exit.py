@@ -1,3 +1,4 @@
+import pytorch_lightning
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -9,6 +10,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 import torchvision.models as models
 import winsound
 import time
+from CustomDataset import Data_prep_224_normal_N
 
 class BranchedAlexNet(nn.Module):
     def __init__(self, num_classes=10):
@@ -133,42 +135,12 @@ class BranchedAlexNet(nn.Module):
         x = torch.flatten(x, 1)
         return x
 
-def main():
+
+def initialize_model():
+    pytorch_lightning.seed_everything(2024)
+
     # Check for GPU availability
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    torch.manual_seed(2024)  # You can use any integer as the seed
-    if device.type == 'cuda':
-        torch.cuda.manual_seed(2024)
-        torch.cuda.manual_seed_all(2024)
-
-        # Define transforms for data augmentation and normalization
-    transform_train = transforms.Compose([
-        transforms.Resize((224, 224)),  # Resize to 224x224
-        transforms.RandomCrop(224, padding=4),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(degrees=15),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    ])
-
-    transform_test = transforms.Compose([
-        transforms.Resize((224, 224)),  # Resize to 224x224
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    ])
-
-    # Load CIFAR-10 dataset
-    trainset = torchvision.datasets.CIFAR10(root='D:/Study/Module/Master Thesis/dataset/CIFAR10', train=True,
-                                            download=True, transform=transform_train)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=100, shuffle=True, num_workers=2)
-
-    testset = torchvision.datasets.CIFAR10(root='D:/Study/Module/Master Thesis/dataset/CIFAR10', train=False,
-                                           download=True, transform=transform_test)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=256, shuffle=False, num_workers=2)
-
-    weights_path = r"D:\Study\Module\Master Thesis\trained_models\B-Alex lr=0.001 from strach\B-Alex_cifar10_epoch_20.pth"
 
     # Create AlexNet model with early exits
     model = BranchedAlexNet(num_classes=10)
@@ -184,8 +156,42 @@ def main():
     model.conv5.load_state_dict(pretrained_alexnet.features[10].state_dict())
 
     model = model.to(device)
-    # print(model)
 
+
+    # Define transforms for data augmentation and normalization
+    # transform_train = transforms.Compose([
+    #     transforms.Resize((224, 224)),  # Resize to 224x224
+    #     transforms.RandomCrop(224, padding=4),
+    #     transforms.RandomHorizontalFlip(),
+    #     transforms.RandomRotation(degrees=15),
+    #     transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+    #     transforms.ToTensor(),
+    #     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    # ])
+    #
+    # transform_test = transforms.Compose([
+    #     transforms.Resize((224, 224)),  # Resize to 224x224
+    #     transforms.ToTensor(),
+    #     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    # ])
+    #
+    # full_trainset = torchvision.datasets.CIFAR10(root='D:/Study/Module/Master Thesis/dataset/CIFAR10', train=True,
+    #                                              download=True, transform=transform_train)
+    # trainset, valset = torch.utils.data.random_split(full_trainset, [40000, 10000])
+    # trainloader = torch.utils.data.DataLoader(trainset, batch_size=100, shuffle=True, num_workers=2)
+    # valloader = torch.utils.data.DataLoader(valset, batch_size=256, shuffle=False, num_workers=2)
+    #
+    # testset = torchvision.datasets.CIFAR10(root='D:/Study/Module/Master Thesis/dataset/CIFAR10', train=False,
+    #                                        download=True, transform=transform_test)
+    # testloader = torch.utils.data.DataLoader(testset, batch_size=256, shuffle=False, num_workers=2)
+
+    root = 'D:/Study/Module/Master Thesis/dataset/CIFAR10'
+    dataprep = Data_prep_224_normal_N(root)
+    trainloader, valloader, testloader = dataprep.create_loaders(batch_size=100, num_workers=2)
+
+    return model, device, trainloader, valloader, testloader
+
+def train(num_epochs):
     # Lists to store train and validation losses
     train_losses = []
     val_losses = []
@@ -196,16 +202,7 @@ def main():
     val_exit3 = []
     val_exit4 = []
     val_exit5 = []
-    num_epochs = 50
-    learning_rate = 0.001
 
-    # Define loss function and optimizer
-    criterion = nn.CrossEntropyLoss()
-
-    # Define optimizer
-    optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=5e-4)
-
-    # Define the learning rate scheduler
     scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs)
 
     start_time = time.time()
@@ -217,7 +214,7 @@ def main():
         correct_train = 0
         total_train = 0
 
-        for i, data in enumerate(trainloader, 0):
+        for i, data in enumerate(trainloader):
             inputs, labels = data[0].to(device), data[1].to(device)
 
             optimizer.zero_grad()
@@ -267,7 +264,7 @@ def main():
         total_val = 0
 
         with torch.no_grad():
-            for data in testloader:
+            for data in valloader:
                 images, labels = data[0].to(device), data[1].to(device)
                 main_out, exit1_out, exit2_out, exit3_out, exit4_out, exit5_out = model(images)
 
@@ -308,7 +305,7 @@ def main():
 
         scheduler.step()
 
-        val_loss /= len(testloader)
+        val_loss /= len(valloader)
         val_losses.append(val_loss)
 
         val_accuracies.append(100 * correct_val / total_val)
@@ -373,11 +370,108 @@ def main():
     plt.show()
     print('Finished Training')
 
+def test():
+    # Test the model after training
+    model.eval()
+    test_loss = 0.0
+    correct_test = 0
+    total_test = 0
+    correct_1 = 0
+    correct_2 = 0
+    correct_3 = 0
+    correct_4 = 0
+    correct_5 = 0
+
+    with torch.no_grad():
+        for data in testloader:
+            images, labels = data[0].to(device), data[1].to(device)
+            main_out, exit1_out, exit2_out, exit3_out, exit4_out, exit5_out = model(images)
+
+            # Calculate individual losses
+            loss_exit1 = criterion(exit1_out, labels)
+            loss_exit2 = criterion(exit2_out, labels)
+            loss_exit3 = criterion(exit3_out, labels)
+            loss_exit4 = criterion(exit4_out, labels)
+            loss_exit5 = criterion(exit5_out, labels)
+            loss_main = criterion(main_out, labels)
+
+            # Combine losses (average them for now)
+            loss_all = ((1 / 6) * loss_exit1
+                        + (1 / 5) * loss_exit2
+                        + (1 / 4) * loss_exit3
+                        + (1 / 3) * loss_exit4
+                        + (1 / 2) * loss_exit5
+                        + loss_main)  # to alleviate gradient imbalance issue; paper EECE
+
+            test_loss += loss_all.item()
+
+            _, predicted_main = torch.max(main_out.data, 1)
+            _, predicted_exit1 = torch.max(exit1_out.data, 1)
+            _, predicted_exit2 = torch.max(exit2_out.data, 1)
+            _, predicted_exit3 = torch.max(exit3_out.data, 1)
+            _, predicted_exit4 = torch.max(exit4_out.data, 1)
+            _, predicted_exit5 = torch.max(exit5_out.data, 1)
+
+            total_test += labels.size(0)
+            correct_test += (predicted_main == labels).sum().item()
+            correct_1 += (predicted_exit1 == labels).sum().item()
+            correct_2 += (predicted_exit2 == labels).sum().item()
+            correct_3 += (predicted_exit3 == labels).sum().item()
+            correct_4 += (predicted_exit4 == labels).sum().item()
+            correct_5 += (predicted_exit5 == labels).sum().item()
+
+
+    test_loss /= len(testloader)
+    test_accuracy = 100 * correct_test / total_test
+    exit1_accuracy = 100 * correct_1 / total_test
+    exit2_accuracy = 100 * correct_2 / total_test
+    exit3_accuracy = 100 * correct_3 / total_test
+    exit4_accuracy = 100 * correct_4 / total_test
+    exit5_accuracy = 100 * correct_5 / total_test
+
+    print(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.2f}%, "
+          f"Exit 1 Accuracy: {exit1_accuracy:.2f}%, Exit 2 Accuracy: {exit2_accuracy:.2f}%, "
+          f"Exit 3 Accuracy: {exit3_accuracy:.2f}%, Exit 4 Accuracy: {exit4_accuracy:.2f}%, "
+          f"Exit 5 Accuracy: {exit5_accuracy:.2f}%")
 
 def play_sound():
     for _ in range(10):
         winsound.PlaySound("SystemHand", winsound.SND_ALIAS)
 
+def show_images_from_valloader(valloader, num_images=10):
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # Get a batch of validation images
+    for images, labels in valloader:
+        break
+
+    # Show images
+    fig, axes = plt.subplots(1, num_images, figsize=(15, 15))
+    for idx in range(num_images):
+        ax = axes[idx]
+        img = images[idx] / 2 + 0.5  # unnormalize
+        npimg = img.numpy()
+        ax.imshow(np.transpose(npimg, (1, 2, 0)))
+        ax.axis('off')
+        ax.set_title(f'Label: {labels[idx].item()}')
+
+    plt.show()
+
+
 if __name__ == '__main__':
-    freeze_support()
-    main()
+
+    model, device, trainloader, valloader, testloader = initialize_model()
+
+    criterion = nn.CrossEntropyLoss()
+    learning_rate = 0.001
+    optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=5e-4)
+
+    TRAIN = False
+    if TRAIN:
+        train(50)
+        test()
+    else:
+        model.load_state_dict(torch.load(r"D:\Study\Module\Master Thesis\trained_models\B-Alex final\B-Alex_cifar10.pth", weights_only=True))
+        test()
+        show_images_from_valloader(valloader)
