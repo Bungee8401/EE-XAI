@@ -1,15 +1,10 @@
 import pytorch_lightning
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
-import torchvision.transforms as transforms
-import torch.nn as nn
-from torchvision.models import alexnet
-import matplotlib.pyplot as plt
-from Alexnet_early_exit import BranchedAlexNet
-from torch.utils.tensorboard import SummaryWriter
+from Vgg16bn_early_exit_small_fc import BranchVGG16BN
 import os
-import time
 from CustomDataset import Data_prep_224_normal_N
 
 # seed for reproducibility
@@ -17,8 +12,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 pytorch_lightning.seed_everything(2024)
 
 # Load the trained model
-model = BranchedAlexNet(num_classes=10).to(device)
-model.load_state_dict(torch.load(r"/home/yibo/PycharmProjects/Thesis/weights/B-Alex final/B-Alex_cifar10.pth", weights_only=True))
+model = BranchVGG16BN(num_classes=10).to(device)
+model = nn.DataParallel(model)
+model.load_state_dict(torch.load(r"weights/Vgg16bn_ee_224/Vgg16bn_epoch_15.pth", weights_only=True))
 
 def save_right_image(image, label, predicted, exit_name, cnt):
     class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
@@ -78,7 +74,7 @@ def threshold_finder(model, dataloader, initial_thresholds, accuracy, step, tole
     best_accuracies = [0] * len(initial_thresholds)
     best_exit_ratios = [0] * len(initial_thresholds)
     goal_accuracy = [acc - tolerance for acc in accuracy]
-    upper_acc = accuracy[-1] #91.7% for this checkpoint
+    upper_acc = accuracy[-1]
 
     for i in range(len(initial_thresholds)):
         print("----finding optimal threshold for early exit point----", i+1)
@@ -148,54 +144,36 @@ def threshold_inference(model, dataloader, exit_thresholds):
                     if predicted == labels[i]:
                         correct_exit1 += 1
 
-                        # save_right_image(images[i], labels[i], predicted, 'exit1', cnt)
-                    # else:
-                        # save_wrong_image(images[i], labels[i], predicted, 'exit1', cnt)
                 elif entropy_exit2[i] < exit_thresholds[1]:
                     _, predicted = torch.max(exit2_out[i].data, 0)
                     exit_counts[1] += 1
                     if predicted == labels[i]:
                         correct_exit2 += (predicted == labels[i]).item()
 
-                        # save_right_image(images[i], labels[i], predicted, 'exit2', cnt)
-                    # else:
-                        # save_wrong_image(images[i], labels[i], predicted, 'exit2', cnt)
                 elif entropy_exit3[i] < exit_thresholds[2]:
                     _, predicted = torch.max(exit3_out[i].data, 0)
                     exit_counts[2] += 1
                     if predicted == labels[i]:
                         correct_exit3 += (predicted == labels[i]).item()
 
-                        # save_right_image(images[i], labels[i], predicted, 'exit3', cnt)
-                    # else:
-                        # save_wrong_image(images[i], labels[i], predicted, 'exit3', cnt)
                 elif entropy_exit4[i] < exit_thresholds[3]:
                     _, predicted = torch.max(exit4_out[i].data, 0)
                     exit_counts[3] += 1
                     if predicted == labels[i]:
                         correct_exit4 += (predicted == labels[i]).item()
 
-                        # save_right_image(images[i], labels[i], predicted, 'exit4', cnt)
-                    # else:
-                        # save_wrong_image(images[i], labels[i], predicted, 'exit4', cnt)
                 elif entropy_exit5[i] < exit_thresholds[4]:
                     _, predicted = torch.max(exit5_out[i].data, 0)
                     exit_counts[4] += 1
                     if predicted == labels[i]:
                         correct_exit5 += (predicted == labels[i]).item()
 
-                        # save_right_image(images[i], labels[i], predicted, 'exit5', cnt)
-                    # else:
-                        # save_wrong_image(images[i], labels[i], predicted, 'exit5', cnt)
                 else:
                     _, predicted = torch.max(main_out[i].data, 0)
                     exit_counts[5] += 1
                     if predicted == labels[i]:
                         correct_main += (predicted == labels[i]).item()
 
-                        # save_right_image(images[i], labels[i], predicted, 'main', cnt)
-                    # else:
-                        # save_wrong_image(images[i], labels[i], predicted, 'main', cnt)
                 cnt += 1
 
     # Calculate accuracy and exit ratios
@@ -260,26 +238,7 @@ def threshold_inference_new(model, category, dataloader, exit_thresholds):
 
     return classified_label, exit_point
 
-if __name__ == '__main__':
-
-    # Initialize TensorBoard
-    log_dir = 'Tensorboard_data/Alex_ee_inference'
-    writer = SummaryWriter(log_dir=log_dir)
-
-    # transform_test = transforms.Compose([
-    #     transforms.Resize((224, 224)),
-    #     transforms.ToTensor(),
-    #     # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    # ])
-    #
-    # testset = torchvision.datasets.CIFAR10(root='D:/Study/Module/Master Thesis/dataset/CIFAR10', train=False, download=True, transform=transform_test)
-    # # testset = torchvision.datasets.ImageFolder(root=r'D:\Code\Thesis\Airplane_right\exit5', transform=transform_test)
-    # testloader = torch.utils.data.DataLoader(testset, batch_size=256, shuffle=False, num_workers=2)
-
-    root = '/home/yibo/PycharmProjects/Thesis/CIFAR10'
-    dataprep = Data_prep_224_normal_N(root)
-    trainloader, valloader, testloader = dataprep.create_loaders(batch_size=100, num_workers=2)
-
+def ee_inference():
     initial_thresholds = [1.0] * 5 # max entropy is 2.3 for 10 class problem, but starting at 1.0 is just faster
 
     initial_accuracy = simple_inference(model, testloader)
@@ -298,7 +257,7 @@ if __name__ == '__main__':
         print(f"threshold_finder Accuracies: {best_accuracies}")
         print(f"threshold_finder Exit Ratios: {best_exit_ratios}")
     else:
-        optimal_thresholds = [0.7, 0.8, 1.0, 0.8, 0.7]
+        optimal_thresholds = [0.5, 0.5, 0.7, 0.85, 0.5]
         print(f"optimal Thresholds already found: {optimal_thresholds}")
 
     # Do threshold inference, also store the wrong imgs locally
@@ -308,111 +267,16 @@ if __name__ == '__main__':
     print(f"threshold_inference Accuracy: {accuracy}")
     print(f"threshold_inference Exit Ratios: {exit_ratios}")
 
-    # Log variables to TensorBoard
-    writer.add_scalars('Accuracy', {
-        'Exit1': accuracy[0],
-        'Exit2': accuracy[1],
-        'Exit3': accuracy[2],
-        'Exit4': accuracy[3],
-        'Exit5': accuracy[4],
-        'Main': accuracy[5]
-    })
+if __name__ == '__main__':
 
-    writer.add_scalars('Exit Ratios', {
-        'Exit1': exit_ratios[0],
-        'Exit2': exit_ratios[1],
-        'Exit3': exit_ratios[2],
-        'Exit4': exit_ratios[3],
-        'Exit5': exit_ratios[4],
-        'Main': exit_ratios[5]
-    })
+    root = '/home/yibo/PycharmProjects/Thesis/CIFAR10'
+    dataprep = Data_prep_224_normal_N(root)
+    trainloader, valloader, testloader = dataprep.create_loaders(batch_size=100, num_workers=2)
 
-    # Close the TensorBoard writer
-    writer.close()
+    ee_inference()
 
-#TODO： 1. threshold_inference function, uses the entropy as the criteria; could be better methods -> paper EENet
-#       2. threshold_finder function, finding thresholds sequentially; wonder if better
-#       3. threshold_finder function, tolerance dont need i think
-
-# simple_inference accuracy: [63.23, 79.73, 86.3, 89.65, 91.71, 91.79]
-# ----finding optimal threshold for early exit point---- 1
-# current thresh: 0.9, Accuracy: 80.96427199385325, Exit Ratio: 52.06
-# current thresh: 0.8, Accuracy: 83.19381841596909, Exit Ratio: 46.59
-# current thresh: 0.7000000000000001, Accuracy: 85.39461020211742, Exit Ratio: 41.56
-# current thresh: 0.6000000000000001, Accuracy: 87.78416872089838, Exit Ratio: 36.51
-# current thresh: 0.5000000000000001, Accuracy: 90.03513254551261, Exit Ratio: 31.31
-# current thresh: 0.40000000000000013, Accuracy: 92.07660533233195, Exit Ratio: 26.63
-# Optimal thresh: 0.5000000000000001, Accuracy: 92.07660533233195, Exit Ratio: 26.63
-# ----finding optimal threshold for early exit point---- 2
-# current thresh: 0.9, Accuracy: 84.05034754837497, Exit Ratio: 53.23
-# current thresh: 0.8, Accuracy: 85.51458670988654, Exit Ratio: 49.36
-# current thresh: 0.7000000000000001, Accuracy: 87.51671868033883, Exit Ratio: 44.86
-# current thresh: 0.6000000000000001, Accuracy: 89.775, Exit Ratio: 40.0
-# current thresh: 0.5000000000000001, Accuracy: 92.1351504826803, Exit Ratio: 35.22
-# Optimal thresh: 0.6000000000000001, Accuracy: 92.1351504826803, Exit Ratio: 35.22
-# ----finding optimal threshold for early exit point---- 3
-# current thresh: 0.9, Accuracy: 78.3498759305211, Exit Ratio: 32.24
-# current thresh: 0.8, Accuracy: 80.2233902759527, Exit Ratio: 30.44
-# current thresh: 0.7000000000000001, Accuracy: 82.01058201058201, Exit Ratio: 28.35
-# current thresh: 0.6000000000000001, Accuracy: 84.47254049782694, Exit Ratio: 25.31
-# current thresh: 0.5000000000000001, Accuracy: 87.01707097933513, Exit Ratio: 22.26
-# current thresh: 0.40000000000000013, Accuracy: 88.9795918367347, Exit Ratio: 19.6
-# current thresh: 0.30000000000000016, Accuracy: 90.40047114252062, Exit Ratio: 16.98
-# current thresh: 0.20000000000000015, Accuracy: 92.10526315789474, Exit Ratio: 14.06
-# Optimal thresh: 0.30000000000000016, Accuracy: 92.10526315789474, Exit Ratio: 14.06
-# ----finding optimal threshold for early exit point---- 4
-# current thresh: 0.9, Accuracy: 76.41597028783659, Exit Ratio: 21.54
-# current thresh: 0.8, Accuracy: 77.59803921568627, Exit Ratio: 20.4
-# current thresh: 0.7000000000000001, Accuracy: 79.07098121085595, Exit Ratio: 19.16
-# current thresh: 0.6000000000000001, Accuracy: 81.18527042577675, Exit Ratio: 17.38
-# current thresh: 0.5000000000000001, Accuracy: 83.15926892950391, Exit Ratio: 15.32
-# current thresh: 0.40000000000000013, Accuracy: 86.34001484780995, Exit Ratio: 13.47
-# current thresh: 0.30000000000000016, Accuracy: 87.54237288135593, Exit Ratio: 11.8
-# current thresh: 0.20000000000000015, Accuracy: 89.12175648702595, Exit Ratio: 10.02
-# current thresh: 0.10000000000000014, Accuracy: 91.92307692307692, Exit Ratio: 7.8
-# Optimal thresh: 0.20000000000000015, Accuracy: 91.92307692307692, Exit Ratio: 7.8
-# ----finding optimal threshold for early exit point---- 5
-# current thresh: 0.9, Accuracy: 77.15487035739314, Exit Ratio: 14.27
-# current thresh: 0.8, Accuracy: 78.51851851851852, Exit Ratio: 13.5
-# current thresh: 0.7000000000000001, Accuracy: 79.76190476190476, Exit Ratio: 12.6
-# current thresh: 0.6000000000000001, Accuracy: 82.57839721254355, Exit Ratio: 11.48
-# current thresh: 0.5000000000000001, Accuracy: 84.7609561752988, Exit Ratio: 10.04
-# current thresh: 0.40000000000000013, Accuracy: 87.31596828992072, Exit Ratio: 8.83
-# current thresh: 0.30000000000000016, Accuracy: 89.20676202860858, Exit Ratio: 7.69
-# current thresh: 0.20000000000000015, Accuracy: 90.89529590288316, Exit Ratio: 6.59
-# current thresh: 0.10000000000000014, Accuracy: 93.13725490196079, Exit Ratio: 5.1
-# Optimal thresh: 0.20000000000000015, Accuracy: 93.13725490196079, Exit Ratio: 5.1
+# simple_inference accuracy: [58.5, 69.51, 78.93, 90.31, 95.48, 95.8]
+# optimal Thresholds already found: [0.5, 0.5, 0.7, 0.85, 0.5]
 # ---------------------------------
-# threshold_finder Thresholds: [0.5000000000000001, 0.6000000000000001, 0.30000000000000016, 0.20000000000000015, 0.20000000000000015]
-# threshold_finder Accuracies: [92.07660533233195, 92.1351504826803, 92.10526315789474, 91.92307692307692, 93.13725490196079]
-# threshold_finder Exit Ratios: [26.63, 35.22, 14.06, 7.8, 5.1]
-# ---------------------------------
-# threshold_inference Accuracy: [92.07660533233195, 92.1351504826803, 92.10526315789474, 91.92307692307692, 93.13725490196079, 62.734584450402146]
-# threshold_inference Exit Ratios: [26.63, 35.22, 14.06, 7.8, 5.1, 11.19]
-
-#  --------------------------------
-# ------ after adding val set ------
-#  --------------------------------
-
-# ---------------------------------------
-# simple_inference accuracy: [63.36, 79.08, 85.85, 89.19, 91.46, 91.77]
-# optimal Thresholds already found: [0.5, 0.6, 0.3, 0.2, 0.2]
-# Seed set to 2024
-# Seed set to 2024
-# ---------------------------------
-# threshold_inference Accuracy: [91.86515207035544, 91.84188393608073, 91.10644257703082, 90.9090909090909, 90.51383399209486, 60.76845298281092]
-# threshold_inference Exit Ratios: [27.29, 35.67, 14.28, 7.81, 5.06, 9.89]
-
-#  --------------------------------
-# ------ only use train_set to test the threshold ------
-#  --------------------------------
-
-# --------in train set----------------
-# optimal_thresholds = [0.7, 0.8, 1.0, 0.8, 0.7]
-# threshold_inference Accuracy: [92.9425344216341, 93.1092336269399, 93.71334499434099, 92.3076923076923, 92.03187250996017, 53.048780487804876]
-# threshold_inference Exit Ratios: [30.3225, 41.7225, 24.2975, 2.21, 0.6275, 0.82]
-
-# --------in test set----------------
-# optimal_thresholds = [0.7, 0.8, 1.0, 0.8, 0.7]
-# threshold_inference Accuracy: [87.81603012372243, 86.35488308115544, 74.49506810709254, 69.43521594684385, 71.68141592920354, 33.65384615384615]
-# threshold_inference Exit Ratios: [37.18, 36.35, 21.29, 3.01, 1.13, 1.04]
+# threshold_inference Accuracy: [92.16090768437338, 92.83299526707235, 92.2420796100731, 93.26747164288328, 93.73695198329854, 62.23776223776224]
+# threshold_inference Exit Ratios: [19.39, 14.79, 24.62, 27.33, 9.58, 4.29]

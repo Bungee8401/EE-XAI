@@ -65,17 +65,22 @@ def load_data(filename):
     print(f"Data loaded from {filename}")
     return loaded_data
 
-def create_dataset(root='D:/Study/Module/Master Thesis/dataset/CIFAR10', transform_training=trans_train, transform_test=trans_test):
+def create_dataset(root, transform_training=trans_train, transform_test=trans_test):
     trainset = datasets.CIFAR10(root=root, train=True, download=True, transform=transform_training)
     testset = datasets.CIFAR10(root=root, train=False, download=True, transform=transform_test)
     return trainset, testset
 
-def create_dataset_32(root='D:/Study/Module/Master Thesis/dataset/CIFAR10', transform_training=trans_train_32, transform_test=trans_test_32):
+def create_dataset_32(root, transform_training=trans_train_32, transform_test=trans_test_32):
     trainset = datasets.CIFAR10(root=root, train=True, download=True, transform=transform_training)
     testset = datasets.CIFAR10(root=root, train=False, download=True, transform=transform_test)
     return trainset, testset
 
-def create_dataset_224_01(root='D:/Study/Module/Master Thesis/dataset/CIFAR10', transform_training=trans_train224_01, transform_test=trans_test224_01):
+def create_dataset_224_01(root, transform_training=trans_train224_01, transform_test=trans_test224_01):
+    trainset = datasets.CIFAR10(root=root, train=True, download=True, transform=transform_training)
+    testset = datasets.CIFAR10(root=root, train=False, download=True, transform=transform_test)
+    return trainset, testset
+
+def create_dataset_224_N(root, transform_training=trans_test, transform_test=trans_test):
     trainset = datasets.CIFAR10(root=root, train=True, download=True, transform=transform_training)
     testset = datasets.CIFAR10(root=root, train=False, download=True, transform=transform_test)
     return trainset, testset
@@ -87,7 +92,7 @@ def get_same_category_index(dataset, category):
         idx = torch.where(torch.tensor(dataset.targets) == category)[0].tolist()
     return idx
 
-root = 'D:/Study/Module/Master Thesis/dataset/CIFAR10'
+root = '/home/yibo/PycharmProjects/Thesis/CIFAR10'
 
 class Data_prep_224_normal_N:
     def __init__(self, root):
@@ -130,7 +135,7 @@ class Data_prep_224_normal_N:
         val_sampler = torch.utils.data.SubsetRandomSampler(val_idx)
         test_sampler = torch.utils.data.SubsetRandomSampler(test_idx)
 
-        trainloader = DataLoader(self.trainset, batch_size=batch_size, shuffle=True, num_workers=num_workers, sampler=train_sampler)
+        trainloader = DataLoader(self.trainset, batch_size=batch_size, shuffle=False, num_workers=num_workers, sampler=train_sampler)
         valloader = DataLoader(self.valset, batch_size=batch_size, shuffle=False, num_workers=num_workers, sampler=val_sampler)
         testloader = DataLoader(self.testset, batch_size=batch_size, shuffle=False, num_workers=num_workers, sampler=test_sampler)
 
@@ -230,10 +235,59 @@ class Data_prep_224_01_N:
 
         return trainloader, valloader, testloader
 
+class Data_prep_224_gen:
+    def __init__(self, root):
+        train_set, self.testset = create_dataset_224_N(root)
+
+        split_path_train = "data_split/CIFAR224_gen_train.pkl"
+        split_path_val = "data_split/CIFAR224_gen_val.pkl"
+        if os.path.exists("./" + split_path_train) and os.path.exists("./" + split_path_val):
+            train_indices, val_indices = (
+                load_data("./" + split_path_train),
+                load_data("./" + split_path_val),
+            )
+            self.trainset = Subset(train_set, train_indices)
+            self.valset = Subset(train_set, val_indices)
+        else:
+            self.trainset, self.valset = random_split(train_set, [int(0.8 * len(train_set)), len(train_set) - int(0.8 * len(train_set))])
+            save_data("./" + split_path_train, self.trainset.indices)
+            save_data("./" + split_path_val, self.valset.indices)
+        self.get_same_category_index = get_same_category_index
+        self.class_num = 10
+        print("Create DataPrep for CIFAR224")
+
+    # @staticmethod
+    def create_loaders(self, batch_size, num_workers):
+
+        trainloader = DataLoader(self.trainset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+        valloader = DataLoader(self.valset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+        testloader = DataLoader(self.testset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+
+        return trainloader, valloader, testloader
+
+    def get_category_index(self, category):
+        train_idx = self.get_same_category_index(self.trainset, category)
+        val_idx = self.get_same_category_index(self.valset, category)
+        test_idx = self.get_same_category_index(self.testset, category)
+        return train_idx, val_idx, test_idx
+
+    def create_catogery_loaders(self, batch_size, num_workers, train_idx, val_idx, test_idx):
+        train_sampler = torch.utils.data.SubsetRandomSampler(train_idx)
+        val_sampler = torch.utils.data.SubsetRandomSampler(val_idx)
+        test_sampler = torch.utils.data.SubsetRandomSampler(test_idx)
+
+        trainloader = DataLoader(self.trainset, batch_size=batch_size, shuffle=False, num_workers=num_workers, sampler=train_sampler)
+        valloader = DataLoader(self.valset, batch_size=batch_size, shuffle=False, num_workers=num_workers, sampler=val_sampler)
+        testloader = DataLoader(self.testset, batch_size=batch_size, shuffle=False, num_workers=num_workers, sampler=test_sampler)
+
+        return trainloader, valloader, testloader
+
 if __name__ == '__main__':
     # root = 'D:/Study/Module/Master Thesis/dataset/CIFAR10'
     dataprep = Data_prep_224_normal_N(root)
 
-    train_loader, val_loader, test_loader = dataprep.create_catogery_loaders(dataprep, 128)
     train_idx, val_idx, test_idx = dataprep.get_category_index(0)
+    train_loader, val_loader, test_loader = dataprep.create_loaders(100, 2)
+
+
     print(train_idx)

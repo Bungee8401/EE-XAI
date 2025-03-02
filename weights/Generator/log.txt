@@ -1,0 +1,312 @@
+Epoch 1/100, Training Loss: 1250.8115234375
+Seed set to 2024
+Seed set to 2024
+Epoch 2/100, Training Loss: 1232.3597412109375
+Seed set to 2024
+Seed set to 2024
+Epoch 3/100, Training Loss: 1329.7188720703125
+Seed set to 2024
+Seed set to 2024
+Epoch 4/100, Training Loss: 1230.744873046875
+Seed set to 2024
+Seed set to 2024
+Epoch 5/100, Training Loss: 1106.029296875
+Seed set to 2024
+Seed set to 2024
+Epoch 6/100, Training Loss: 1152.2232666015625
+Seed set to 2024
+Seed set to 2024
+Epoch 7/100, Training Loss: 1176.496337890625
+Seed set to 2024
+Seed set to 2024
+Epoch 8/100, Training Loss: 1038.240966796875
+Seed set to 2024
+Seed set to 2024
+Epoch 9/100, Training Loss: 951.868896484375
+Seed set to 2024
+Seed set to 2024
+Epoch 10/100, Training Loss: 892.5533447265625
+Seed set to 2024
+Seed set to 2024
+Epoch 11/100, Training Loss: 937.4000854492188
+Seed set to 2024
+Seed set to 2024
+Epoch 12/100, Training Loss: 819.150634765625
+Seed set to 2024
+Seed set to 2024
+Epoch 13/100, Training Loss: 1021.4742431640625
+Seed set to 2024
+Seed set to 2024
+Epoch 14/100, Training Loss: 865.6249389648438
+Seed set to 2024
+Seed set to 2024
+Epoch 15/100, Training Loss: 1040.91845703125
+Seed set to 2024
+Seed set to 2024
+Epoch 16/100, Training Loss: 1034.939208984375
+Seed set to 2024
+Seed set to 2024
+Epoch 17/100, Training Loss: 984.9096069335938
+Seed set to 2024
+Seed set to 2024
+Epoch 18/100, Training Loss: 1035.5941162109375
+Seed set to 2024
+Seed set to 2024
+Epoch 19/100, Training Loss: 839.0269165039062
+Seed set to 2024
+Seed set to 2024
+Epoch 20/100, Training Loss: 919.5589599609375
+Seed set to 2024
+Seed set to 2024
+Epoch 21/100, Training Loss: 1087.1131591796875
+Seed set to 2024
+Seed set to 2024
+Epoch 22/100, Training Loss: 867.10205078125
+Seed set to 2024
+Seed set to 2024
+Epoch 23/100, Training Loss: 849.1414794921875
+Seed set to 2024
+Seed set to 2024
+Epoch 24/100, Training Loss: 882.300537109375
+Seed set to 2024
+Seed set to 2024
+Epoch 25/100, Training Loss: 909.39990234375
+Seed set to 2024
+Seed set to 2024
+Epoch 26/100, Training Loss: 1045.597412109375
+Seed set to 2024
+Seed set to 2024
+Epoch 27/100, Training Loss: 944.960205078125
+Seed set to 2024
+Seed set to 2024
+Epoch 28/100, Training Loss: 918.7236328125
+Seed set to 2024
+Seed set to 2024
+Epoch 29/100, Training Loss: 745.1566162109375
+Seed set to 2024
+Seed set to 2024
+Epoch 30/100, Training Loss: 839.9578857421875
+Seed set to 2024
+Seed set to 2024
+Epoch 31/100, Training Loss: 887.786865234375
+Seed set to 2024
+Seed set to 2024
+Epoch 32/100, Training Loss: 853.1300048828125
+Seed set to 2024
+Seed set to 2024
+Epoch 33/100, Training Loss: 876.862060546875
+Seed set to 2024
+Seed set to 2024
+Epoch 34/100, Training Loss: 817.27734375
+Seed set to 2024
+Seed set to 2024
+Epoch 35/100, Training Loss: 763.347412109375
+Seed set to 2024
+Seed set to 2024
+Epoch 36/100, Training Loss: 967.1229248046875
+Seed set to 2024
+Seed set to 2024
+Epoch 37/100, Training Loss: 731.367431640625
+Seed set to 2024
+Seed set to 2024
+Epoch 38/100, Training Loss: 722.0025634765625
+Seed set to 2024
+Seed set to 2024
+Epoch 39/100, Training Loss: 770.9271240234375
+Seed set to 2024
+Seed set to 2024
+Epoch 40/100, Training Loss: 843.0925903320312
+Seed set to 2024
+Seed set to 2024
+Epoch 41/100, Training Loss: 864.9995727539062
+Seed set to 2024
+Seed set to 2024
+Epoch 42/100, Training Loss: 891.0071411132812
+Seed set to 2024
+Seed set to 2024
+Epoch 43/100, Training Loss: 729.4415893554688
+Seed set to 2024
+Seed set to 2024
+Epoch 44/100, Training Loss: 783.3843994140625
+Seed set to 2024
+Seed set to 2024
+Epoch 45/100, Training Loss: 999.83056640625
+Seed set to 2024
+Seed set to 2024
+Epoch 46/100, Training Loss: 813.025634765625
+Seed set to 2024
+Seed set to 2024
+Epoch 47/100, Training Loss: 862.619873046875
+Seed set to 2024
+Seed set to 2024
+Epoch 48/100, Training Loss: 828.0672607421875
+Seed set to 2024
+Seed set to 2024
+Epoch 49/100, Training Loss: 801.7794189453125
+Seed set to 2024
+Seed set to 2024
+Epoch 50/100, Training Loss: 797.67431640625
+Seed set to 2024
+Seed set to 2024
+Epoch 51/100, Training Loss: 827.6553955078125
+Seed set to 2024
+Seed set to 2024
+Epoch 52/100, Training Loss: 803.3448486328125
+Seed set to 2024
+Seed set to 2024
+Epoch 53/100, Training Loss: 796.974853515625
+Seed set to 2024
+Seed set to 2024
+Epoch 54/100, Training Loss: 802.7647705078125
+Seed set to 2024
+Seed set to 2024
+Epoch 55/100, Training Loss: 860.858642578125
+Seed set to 2024
+Seed set to 2024
+Epoch 56/100, Training Loss: 873.7576293945312
+Seed set to 2024
+Seed set to 2024
+Epoch 57/100, Training Loss: 809.3861083984375
+Seed set to 2024
+Seed set to 2024
+Epoch 58/100, Training Loss: 816.97314453125
+Seed set to 2024
+Seed set to 2024
+Epoch 59/100, Training Loss: 984.7637329101562
+Seed set to 2024
+Seed set to 2024
+Epoch 60/100, Training Loss: 873.8359375
+Seed set to 2024
+Seed set to 2024
+Epoch 61/100, Training Loss: 840.4808349609375
+Seed set to 2024
+Seed set to 2024
+Epoch 62/100, Training Loss: 661.3951416015625
+Seed set to 2024
+Seed set to 2024
+Epoch 63/100, Training Loss: 805.506103515625
+Seed set to 2024
+Seed set to 2024
+Epoch 64/100, Training Loss: 703.1968994140625
+Seed set to 2024
+Seed set to 2024
+Epoch 65/100, Training Loss: 724.9844360351562
+Seed set to 2024
+Seed set to 2024
+Epoch 66/100, Training Loss: 678.925048828125
+Seed set to 2024
+Seed set to 2024
+Epoch 67/100, Training Loss: 841.754638671875
+Seed set to 2024
+Seed set to 2024
+Epoch 68/100, Training Loss: 889.9935913085938
+Seed set to 2024
+Seed set to 2024
+Epoch 69/100, Training Loss: 948.609619140625
+Seed set to 2024
+Seed set to 2024
+Epoch 70/100, Training Loss: 862.0189208984375
+Seed set to 2024
+Seed set to 2024
+Epoch 71/100, Training Loss: 721.0662841796875
+Seed set to 2024
+Seed set to 2024
+Epoch 72/100, Training Loss: 701.3457641601562
+Seed set to 2024
+Seed set to 2024
+Epoch 73/100, Training Loss: 842.3297729492188
+Seed set to 2024
+Seed set to 2024
+Epoch 74/100, Training Loss: 658.4061279296875
+Seed set to 2024
+Seed set to 2024
+Epoch 75/100, Training Loss: 739.4085693359375
+Seed set to 2024
+Seed set to 2024
+Epoch 76/100, Training Loss: 854.6993408203125
+Seed set to 2024
+Seed set to 2024
+Epoch 77/100, Training Loss: 702.2369384765625
+Seed set to 2024
+Seed set to 2024
+Epoch 78/100, Training Loss: 667.0526123046875
+Seed set to 2024
+Seed set to 2024
+Epoch 79/100, Training Loss: 753.5562744140625
+Seed set to 2024
+Seed set to 2024
+Epoch 80/100, Training Loss: 850.1754150390625
+Seed set to 2024
+Seed set to 2024
+Epoch 81/100, Training Loss: 738.299072265625
+Seed set to 2024
+Seed set to 2024
+Epoch 82/100, Training Loss: 722.157958984375
+Seed set to 2024
+Seed set to 2024
+Epoch 83/100, Training Loss: 683.6192626953125
+Seed set to 2024
+Seed set to 2024
+Epoch 84/100, Training Loss: 700.7973022460938
+Seed set to 2024
+Seed set to 2024
+Epoch 85/100, Training Loss: 878.769775390625
+Seed set to 2024
+Seed set to 2024
+Epoch 86/100, Training Loss: 719.9820556640625
+Seed set to 2024
+Seed set to 2024
+Epoch 87/100, Training Loss: 712.328369140625
+Seed set to 2024
+Seed set to 2024
+Epoch 88/100, Training Loss: 566.221923828125
+Seed set to 2024
+Seed set to 2024
+Epoch 89/100, Training Loss: 750.9561157226562
+Seed set to 2024
+Seed set to 2024
+Epoch 90/100, Training Loss: 761.7804565429688
+Seed set to 2024
+Seed set to 2024
+Epoch 91/100, Training Loss: 744.2205810546875
+Seed set to 2024
+Seed set to 2024
+Epoch 92/100, Training Loss: 780.686767578125
+Seed set to 2024
+Seed set to 2024
+Epoch 93/100, Training Loss: 721.659423828125
+Seed set to 2024
+Seed set to 2024
+Epoch 94/100, Training Loss: 838.7677001953125
+Seed set to 2024
+Seed set to 2024
+Epoch 95/100, Training Loss: 790.1326293945312
+Seed set to 2024
+Seed set to 2024
+Epoch 96/100, Training Loss: 724.840087890625
+Seed set to 2024
+Seed set to 2024
+Epoch 97/100, Training Loss: 776.6903076171875
+Seed set to 2024
+Seed set to 2024
+Epoch 98/100, Training Loss: 668.041015625
+Seed set to 2024
+Seed set to 2024
+Epoch 99/100, Training Loss: 743.7769165039062
+Seed set to 2024
+Seed set to 2024
+Epoch 100/100, Training Loss: 554.381103515625
+Seed set to 2024
+Seed set to 2024
+torch.float32
+torch.float32
+Original Image - label: tensor([0, 0, 9, 0, 9, 0, 0, 0, 0, 0, 6, 0, 1, 0, 0, 9, 0, 0, 0, 1, 0, 0, 0, 9,
+        0, 0, 0, 9, 9, 7, 0, 0, 0, 8, 0, 9, 9, 1, 1, 0, 1, 9, 2, 1, 0, 1, 0, 0,
+        0, 0, 9, 0, 0, 0, 1, 7, 9, 7, 0, 0, 9, 0, 9, 0, 0, 8, 2, 9, 0, 1, 1, 0,
+        0, 0, 0, 9, 0, 0, 0, 0, 9, 0, 9, 7, 0, 0, 9, 0, 1, 9, 0, 8, 8, 0, 0, 0,
+        0, 0, 9, 0], device='cuda:0'), Exit Location: [0, 1, 2, 0, 2, 1, 1, 1, 1, 1, 2, 0, 4, 0, 1, 1, 1, 1, 0, 2, 0, 0, 0, 1, 1, 0, 0, 1, 5, 2, 0, 1, 1, 1, 4, 1, 3, 1, 1, 1, 2, 2, 3, 4, 1, 1, 4, 0, 0, 1, 2, 4, 1, 4, 1, 5, 4, 5, 1, 0, 2, 0, 2, 2, 1, 1, 1, 2, 0, 0, 0, 0, 1, 1, 1, 4, 1, 1, 0, 1, 5, 1, 0, 4, 1, 1, 1, 2, 3, 3, 0, 2, 1, 5, 4, 0, 0, 3, 2, 0]
+Generated Image - label: tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0], device='cuda:0'), Exit Location: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]

@@ -1,0 +1,94 @@
+/home/yibo/.conda/envs/Thesis_server/bin/python /home/yibo/PycharmProjects/Thesis/Vgg16bn_early_exit_small_fc.py
+Seed set to 2024
+/home/yibo/.conda/envs/Thesis_server/lib/python3.11/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=VGG16_BN_Weights.IMAGENET1K_V1`. You can also use `weights=VGG16_BN_Weights.DEFAULT` to get the most up-to-date weights.
+  warnings.warn(msg)
+Files already downloaded and verified
+Files already downloaded and verified
+Data loaded from ./data_split/CIFAR224_train.pkl
+Data loaded from ./data_split/CIFAR224_val.pkl
+Create DataPrep for CIFAR224
+Epoch [1/20], avg Train Loss: 2.3165, avg Val Loss: 1.5620
+Epoch [1/20], main Train Accuracy: 79.20%, main Val Accuracy: 88.58%
+Exit 1 val Accuracy: 42.58%, Exit 2 val Accuracy: 53.90%, Exit 3 val Accuracy: 62.17%, Exit 4 val Accuracy: 75.15%, Exit 5 val Accuracy: 88.90%
+Time per epoch: 0h 2m 30s
+Epoch [2/20], avg Train Loss: 1.4183, avg Val Loss: 1.2938
+Epoch [2/20], main Train Accuracy: 89.72%, main Val Accuracy: 91.60%
+Exit 1 val Accuracy: 48.60%, Exit 2 val Accuracy: 59.03%, Exit 3 val Accuracy: 68.28%, Exit 4 val Accuracy: 79.76%, Exit 5 val Accuracy: 91.24%
+Time per epoch: 0h 2m 29s
+Epoch [3/20], avg Train Loss: 1.1933, avg Val Loss: 1.1764
+Epoch [3/20], main Train Accuracy: 92.23%, main Val Accuracy: 92.88%
+Exit 1 val Accuracy: 51.83%, Exit 2 val Accuracy: 60.09%, Exit 3 val Accuracy: 70.84%, Exit 4 val Accuracy: 82.85%, Exit 5 val Accuracy: 92.79%
+Time per epoch: 0h 2m 30s
+Epoch [4/20], avg Train Loss: 1.0698, avg Val Loss: 1.1401
+Epoch [4/20], main Train Accuracy: 93.70%, main Val Accuracy: 92.69%
+Exit 1 val Accuracy: 52.78%, Exit 2 val Accuracy: 61.40%, Exit 3 val Accuracy: 72.73%, Exit 4 val Accuracy: 84.19%, Exit 5 val Accuracy: 92.34%
+Time per epoch: 0h 2m 30s
+Epoch [5/20], avg Train Loss: 0.9749, avg Val Loss: 1.0892
+Epoch [5/20], main Train Accuracy: 94.83%, main Val Accuracy: 93.50%
+Exit 1 val Accuracy: 54.23%, Exit 2 val Accuracy: 63.99%, Exit 3 val Accuracy: 72.45%, Exit 4 val Accuracy: 84.70%, Exit 5 val Accuracy: 93.08%
+Time per epoch: 0h 2m 27s
+Epoch [6/20], avg Train Loss: 0.9071, avg Val Loss: 1.0810
+Epoch [6/20], main Train Accuracy: 95.77%, main Val Accuracy: 93.59%
+Exit 1 val Accuracy: 52.70%, Exit 2 val Accuracy: 61.51%, Exit 3 val Accuracy: 72.95%, Exit 4 val Accuracy: 85.73%, Exit 5 val Accuracy: 93.38%
+Time per epoch: 0h 2m 28s
+Epoch [7/20], avg Train Loss: 0.8484, avg Val Loss: 1.0426
+Epoch [7/20], main Train Accuracy: 96.32%, main Val Accuracy: 93.54%
+Exit 1 val Accuracy: 55.62%, Exit 2 val Accuracy: 65.29%, Exit 3 val Accuracy: 73.73%, Exit 4 val Accuracy: 86.03%, Exit 5 val Accuracy: 93.25%
+Time per epoch: 0h 2m 29s
+Epoch [8/20], avg Train Loss: 0.7966, avg Val Loss: 0.9982
+Epoch [8/20], main Train Accuracy: 97.00%, main Val Accuracy: 93.91%
+Exit 1 val Accuracy: 57.65%, Exit 2 val Accuracy: 66.65%, Exit 3 val Accuracy: 75.07%, Exit 4 val Accuracy: 86.97%, Exit 5 val Accuracy: 93.90%
+Time per epoch: 0h 2m 29s
+Epoch [9/20], avg Train Loss: 0.7621, avg Val Loss: 0.9861
+Epoch [9/20], main Train Accuracy: 97.38%, main Val Accuracy: 93.95%
+Exit 1 val Accuracy: 57.46%, Exit 2 val Accuracy: 66.72%, Exit 3 val Accuracy: 75.51%, Exit 4 val Accuracy: 87.49%, Exit 5 val Accuracy: 93.73%
+Time per epoch: 0h 2m 29s
+Epoch [10/20], avg Train Loss: 0.7307, avg Val Loss: 0.9796
+Epoch [10/20], main Train Accuracy: 97.68%, main Val Accuracy: 94.22%
+Exit 1 val Accuracy: 57.88%, Exit 2 val Accuracy: 67.85%, Exit 3 val Accuracy: 76.00%, Exit 4 val Accuracy: 87.68%, Exit 5 val Accuracy: 93.89%
+Time per epoch: 0h 2m 27s
+Epoch [11/20], avg Train Loss: 0.6977, avg Val Loss: 0.9416
+Epoch [11/20], main Train Accuracy: 98.08%, main Val Accuracy: 94.54%
+Exit 1 val Accuracy: 58.72%, Exit 2 val Accuracy: 68.36%, Exit 3 val Accuracy: 76.31%, Exit 4 val Accuracy: 88.21%, Exit 5 val Accuracy: 94.42%
+Time per epoch: 0h 2m 26s
+Epoch [12/20], avg Train Loss: 0.6711, avg Val Loss: 0.9209
+Epoch [12/20], main Train Accuracy: 98.39%, main Val Accuracy: 95.02%
+Exit 1 val Accuracy: 59.02%, Exit 2 val Accuracy: 69.05%, Exit 3 val Accuracy: 77.57%, Exit 4 val Accuracy: 88.45%, Exit 5 val Accuracy: 94.57%
+Time per epoch: 0h 2m 31s
+Epoch [13/20], avg Train Loss: 0.6451, avg Val Loss: 0.9335
+Epoch [13/20], main Train Accuracy: 98.74%, main Val Accuracy: 94.66%
+Exit 1 val Accuracy: 58.53%, Exit 2 val Accuracy: 68.97%, Exit 3 val Accuracy: 77.11%, Exit 4 val Accuracy: 88.66%, Exit 5 val Accuracy: 94.61%
+Time per epoch: 0h 2m 28s
+Epoch [14/20], avg Train Loss: 0.6290, avg Val Loss: 0.9004
+Epoch [14/20], main Train Accuracy: 98.80%, main Val Accuracy: 95.14%
+Exit 1 val Accuracy: 59.36%, Exit 2 val Accuracy: 69.07%, Exit 3 val Accuracy: 77.83%, Exit 4 val Accuracy: 88.81%, Exit 5 val Accuracy: 94.77%
+Time per epoch: 0h 2m 27s
+Epoch [15/20], avg Train Loss: 0.6144, avg Val Loss: 0.9099
+Epoch [15/20], main Train Accuracy: 98.94%, main Val Accuracy: 94.76%
+Exit 1 val Accuracy: 60.20%, Exit 2 val Accuracy: 69.79%, Exit 3 val Accuracy: 78.05%, Exit 4 val Accuracy: 89.02%, Exit 5 val Accuracy: 94.49%
+Time per epoch: 0h 2m 28s
+Epoch [16/20], avg Train Loss: 0.6063, avg Val Loss: 0.8998
+Epoch [16/20], main Train Accuracy: 98.99%, main Val Accuracy: 95.14%
+Exit 1 val Accuracy: 59.96%, Exit 2 val Accuracy: 69.20%, Exit 3 val Accuracy: 78.21%, Exit 4 val Accuracy: 89.13%, Exit 5 val Accuracy: 94.74%
+Time per epoch: 0h 2m 29s
+Epoch [17/20], avg Train Loss: 0.5908, avg Val Loss: 0.8859
+Epoch [17/20], main Train Accuracy: 99.28%, main Val Accuracy: 95.25%
+Exit 1 val Accuracy: 60.40%, Exit 2 val Accuracy: 69.51%, Exit 3 val Accuracy: 77.86%, Exit 4 val Accuracy: 89.22%, Exit 5 val Accuracy: 95.01%
+Time per epoch: 0h 2m 28s
+Epoch [18/20], avg Train Loss: 0.5850, avg Val Loss: 0.8732
+Epoch [18/20], main Train Accuracy: 99.29%, main Val Accuracy: 95.38%
+Exit 1 val Accuracy: 60.92%, Exit 2 val Accuracy: 70.20%, Exit 3 val Accuracy: 78.35%, Exit 4 val Accuracy: 89.52%, Exit 5 val Accuracy: 95.06%
+Time per epoch: 0h 2m 29s
+Epoch [19/20], avg Train Loss: 0.5862, avg Val Loss: 0.8856
+Epoch [19/20], main Train Accuracy: 99.25%, main Val Accuracy: 95.17%
+Exit 1 val Accuracy: 60.66%, Exit 2 val Accuracy: 69.98%, Exit 3 val Accuracy: 77.95%, Exit 4 val Accuracy: 89.35%, Exit 5 val Accuracy: 94.76%
+Time per epoch: 0h 2m 29s
+Epoch [20/20], avg Train Loss: 0.5816, avg Val Loss: 0.8884
+Epoch [20/20], main Train Accuracy: 99.28%, main Val Accuracy: 95.34%
+Exit 1 val Accuracy: 60.00%, Exit 2 val Accuracy: 69.64%, Exit 3 val Accuracy: 78.21%, Exit 4 val Accuracy: 89.13%, Exit 5 val Accuracy: 94.93%
+Time per epoch: 0h 2m 29s
+Training completed in: 49m 46s
+Finished Training
+Test Loss: 0.8462, Test Accuracy: 96.02%, Exit 1 Accuracy: 58.94%, Exit 2 Accuracy: 70.18%, Exit 3 Accuracy: 79.22%, Exit 4 Accuracy: 90.32%, Exit 5 Accuracy: 95.58%
+
+Process finished with exit code 0

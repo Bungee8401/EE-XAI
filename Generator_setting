@@ -1,0 +1,65 @@
+# 0 airplane
+    100 epoch works
+    500 * exit_loss  +  200 * cls_loss   + 500* sim_loss
+
+# 3 cat (not perfect, often misclassified as dog
+    300 epoch
+    cls_loss switch to MSE(output_logits, label)
+    500 * exit_loss  +  1000 * cls_loss   + 500* sim_loss
+
+# 5 dog
+    300 epoch
+    cls_loss switch to MSE(output_logits, label)
+    500 * exit_loss  +  1000 * cls_loss   + 500* sim_loss
+
+# 4 deer (not at all, wonder why
+    500 epoch
+    MSE cls_loss
+    500 * exit_loss  +  1000 * cls_loss   + 500* sim_loss
+
+
+# 7 horse
+    300 epoch
+    cls_loss switch to MSE(output_logits, label)
+    500 * exit_loss  +  1000 * cls_loss   + 500* sim_loss
+
+# 9 truck (not at all
+    200 epoch
+    two cls_loss
+    exit_loss  +  500 * cls_loss2 +  500 * cls_loss1 + 500 * sim_loss
+
+    maybe, we dont have to always let them early exit. even if the gen_imgs exit later, can also be used as examples
+    to analyze! just negative examples against the original imgs
+
+
+
+--------------------complexity test of generator and classifier------------------------
+
+# 9 truck
+    weights         loaded
+    exit            disable E1, E2;
+                    E3 can be classified perfectly
+                    -> generator? more like classifier not enough to tell
+
+
+-------------------- Generator224 loss paras --------------------------------
+# 3 cat
+    weights         train 200 epochs
+                    a) exit_loss + ... -> maintain the same exit location, pics looking as original, no weird looking patterns
+                    b) 200 * exit_loss + ... -> E1 works perfectly, but pics have the same weird patterns at corner, might be
+                    c) 100 * exit_loss + ... -> E1 works, corner weird patterns, improve a bit at the early exit
+                    d) 150 * exit_loss + ... -> a good compromise
+
+                    change exit_loss to .mean(all exits); rest the same
+                    a) 200 * exit_loss -> maintain original while correcting wrong, mild on EE position change;
+                    b) 250 * exit_loss -> maintain original while correcting wrong, 3/4 maintain or EE, 1/4 exit late
+                    c) 500 * exit_loss -> all E0 and correct. but with severe edge pattern
+
+
+# 0 airplane
+    weights         train 200 epochs
+                    a) 250 * exit_loss  -> mostly maintain
+
+                    train 100 epochs
+                    b) 500 * exit_loss  -> all E0
+

@@ -1,111 +1,178 @@
-import pytorch_lightning
 import torch
 import torch.nn as nn
+import pytorch_lightning
 import torch.optim as optim
-import torchvision
-import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
-from multiprocessing import freeze_support
 from torch.optim.lr_scheduler import CosineAnnealingLR
 import torchvision.models as models
-# import winsound
-import time
 from CustomDataset import Data_prep_224_normal_N
+import time
+from captum.attr import IntegratedGradients, Occlusion, LayerGradCam, LayerAttribution
+from captum.attr import visualization as viz
+import torchvision.transforms as transforms
+import numpy as np
+from PIL import Image
+import requests
 
-class BranchedAlexNet(nn.Module):
+class BranchVGG16BN(nn.Module):
     def __init__(self, num_classes=10):
-        super(BranchedAlexNet, self).__init__()
+        super(BranchVGG16BN, self).__init__()
 
         self.num_classes = num_classes
 
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=11, stride=4, padding=2)
-        self.relu1 = nn.ReLU(inplace=False)
-        self.pool1 = nn.MaxPool2d(kernel_size=3, stride=2)
+        # Block 1
+        self.conv1_1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
+        self.bn1_1 = nn.BatchNorm2d(64)
+        self.relu1_1 = nn.ReLU(inplace=True)
+        self.conv1_2 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
+        self.bn1_2 = nn.BatchNorm2d(64)
+        self.relu1_2 = nn.ReLU(inplace=True)
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        self.conv2 = nn.Conv2d(64, 192, kernel_size=5, padding=2)
-        self.relu2 = nn.ReLU(inplace=False)
-        self.pool2 = nn.MaxPool2d(kernel_size=3, stride=2)
+        # Block 2
+        self.conv2_1 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.bn2_1 = nn.BatchNorm2d(128)
+        self.relu2_1 = nn.ReLU(inplace=True)
+        self.conv2_2 = nn.Conv2d(128, 128, kernel_size=3, padding=1)
+        self.bn2_2 = nn.BatchNorm2d(128)
+        self.relu2_2 = nn.ReLU(inplace=True)
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        self.conv3 = nn.Conv2d(192, 384, kernel_size=3, padding=1)
-        self.relu3 = nn.ReLU(inplace=False)
+        # Block 3
+        self.conv3_1 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
+        self.bn3_1 = nn.BatchNorm2d(256)
+        self.relu3_1 = nn.ReLU(inplace=True)
+        self.conv3_2 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.bn3_2 = nn.BatchNorm2d(256)
+        self.relu3_2 = nn.ReLU(inplace=True)
+        self.conv3_3 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.bn3_3 = nn.BatchNorm2d(256)
+        self.relu3_3 = nn.ReLU(inplace=True)
+        self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        self.conv4 = nn.Conv2d(384, 256, kernel_size=3, padding=1)
-        self.relu4 = nn.ReLU(inplace=False)
+        # Block 4
+        self.conv4_1 = nn.Conv2d(256, 512, kernel_size=3, padding=1)
+        self.bn4_1 = nn.BatchNorm2d(512)
+        self.relu4_1 = nn.ReLU(inplace=True)
+        self.conv4_2 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.bn4_2 = nn.BatchNorm2d(512)
+        self.relu4_2 = nn.ReLU(inplace=True)
+        self.conv4_3 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.bn4_3 = nn.BatchNorm2d(512)
+        self.relu4_3 = nn.ReLU(inplace=True)
+        self.pool4 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        self.conv5 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
-        self.relu5 = nn.ReLU(inplace=False)
-        self.pool5 = nn.MaxPool2d(kernel_size=3, stride=2)
-        self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
+        # Block 5
+        self.conv5_1 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.bn5_1 = nn.BatchNorm2d(512)
+        self.relu5_1 = nn.ReLU(inplace=True)
+        self.conv5_2 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.bn5_2 = nn.BatchNorm2d(512)
+        self.relu5_2 = nn.ReLU(inplace=True)
+        self.conv5_3 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.bn5_3 = nn.BatchNorm2d(512)
+        self.relu5_3 = nn.ReLU(inplace=True)
+        self.pool5 = nn.MaxPool2d(kernel_size=2, stride=2)
 
+        # Fully connected layers
+        self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
         self.classifier = nn.Sequential(
-            nn.Dropout(0.5),
-            nn.Linear(256 * 6 * 6, 4096),
-            nn.ReLU(inplace=False),
-            nn.Dropout(0.5),
-            nn.Linear(4096, 1024),
-            nn.ReLU(inplace=False),
-            nn.Linear(1024, num_classes),
+            nn.Linear(512 * 7 * 7, 4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(),
+            nn.Linear(4096, 4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(),
+            nn.Linear(4096, num_classes)
         )
 
-        # Branch 1 after 1st group
+        # Branches for early exits
         self.branch1 = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(46656, 1024),
-            nn.Linear(1024, self.num_classes),
+            nn.Linear(64 * 112 * 112, self.num_classes)
         )
 
-        # Branch 2 after 2nd group
         self.branch2 = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(32448, 1024),
-            nn.Linear(1024, self.num_classes),
+            nn.Linear(128 * 56 * 56, self.num_classes)
         )
 
-        # Branch 3 after 3rd group
         self.branch3 = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(384 * 13 * 13, 1024),
-            nn.Linear(1024, self.num_classes),
+            nn.Linear(256 * 28 * 28, self.num_classes)
         )
 
-        # Branch 4 after 4th group
         self.branch4 = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(256 * 13 * 13, 1024),
-            nn.Linear(1024, self.num_classes),
+            nn.Linear(512 * 14 * 14,  self.num_classes)
         )
 
-        # Branch 5 after 5th group
         self.branch5 = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(256 * 6 * 6, 1024),
-            nn.Linear(1024, self.num_classes),
+            nn.Linear(512 * 7 * 7, self.num_classes)
         )
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.relu1(x)
+        # Block 1
+        x = self.conv1_1(x)
+        x = self.bn1_1(x)
+        x = self.relu1_1(x)
+        x = self.conv1_2(x)
+        x = self.bn1_2(x)
+        x = self.relu1_2(x)
         x = self.pool1(x)
         out_branch1 = self.branch1(x)
 
-        x = self.conv2(x)
-        x = self.relu2(x)
+        # Block 2
+        x = self.conv2_1(x)
+        x = self.bn2_1(x)
+        x = self.relu2_1(x)
+        x = self.conv2_2(x)
+        x = self.bn2_2(x)
+        x = self.relu2_2(x)
         x = self.pool2(x)
         out_branch2 = self.branch2(x)
 
-        x = self.conv3(x)
-        x = self.relu3(x)
+        # Block 3
+        x = self.conv3_1(x)
+        x = self.bn3_1(x)
+        x = self.relu3_1(x)
+        x = self.conv3_2(x)
+        x = self.bn3_2(x)
+        x = self.relu3_2(x)
+        x = self.conv3_3(x)
+        x = self.bn3_3(x)
+        x = self.relu3_3(x)
+        x = self.pool3(x)
         out_branch3 = self.branch3(x)
 
-        x = self.conv4(x)
-        x = self.relu4(x)
+        # Block 4
+        x = self.conv4_1(x)
+        x = self.bn4_1(x)
+        x = self.relu4_1(x)
+        x = self.conv4_2(x)
+        x = self.bn4_2(x)
+        x = self.relu4_2(x)
+        x = self.conv4_3(x)
+        x = self.bn4_3(x)
+        x = self.relu4_3(x)
+        x = self.pool4(x)
         out_branch4 = self.branch4(x)
 
-        x = self.conv5(x)
-        x = self.relu5(x)
+        # Block 5
+        x = self.conv5_1(x)
+        x = self.bn5_1(x)
+        x = self.relu5_1(x)
+        x = self.conv5_2(x)
+        x = self.bn5_2(x)
+        x = self.relu5_2(x)
+        x = self.conv5_3(x)
+        x = self.bn5_3(x)
+        x = self.relu5_3(x)
         x = self.pool5(x)
         out_branch5 = self.branch5(x)
 
+        # Fully connected layers
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
         out_main = self.classifier(x)
@@ -113,58 +180,60 @@ class BranchedAlexNet(nn.Module):
         return out_main, out_branch1, out_branch2, out_branch3, out_branch4, out_branch5
 
     def extract_features(self, x):
-        x = self.conv1(x)
-        x = self.relu1(x)
+        # Feature extraction for downstream tasks
+        x = self.conv1_1(x)
+        x = self.bn1_1(x)
+        x = self.relu1_1(x)
+        x = self.conv1_2(x)
+        x = self.bn1_2(x)
+        x = self.relu1_2(x)
         x = self.pool1(x)
 
-        x = self.conv2(x)
-        x = self.relu2(x)
+        x = self.conv2_1(x)
+        x = self.bn2_1(x)
+        x = self.relu2_1(x)
+        x = self.conv2_2(x)
+        x = self.bn2_2(x)
+        x = self.relu2_2(x)
         x = self.pool2(x)
 
-        x = self.conv3(x)
-        x = self.relu3(x)
+        x = self.conv3_1(x)
+        x = self.bn3_1(x)
+        x = self.relu3_1(x)
+        x = self.conv3_2(x)
+        x = self.bn3_2(x)
+        x = self.relu3_2(x)
+        x = self.conv3_3(x)
+        x = self.bn3_3(x)
+        x = self.relu3_3(x)
+        x = self.pool3(x)
 
-        x = self.conv4(x)
-        x = self.relu4(x)
+        x = self.conv4_1(x)
+        x = self.bn4_1(x)
+        x = self.relu4_1(x)
+        x = self.conv4_2(x)
+        x = self.bn4_2(x)
+        x = self.relu4_2(x)
+        x = self.conv4_3(x)
+        x = self.bn4_3(x)
+        x = self.relu4_3(x)
+        x = self.pool4(x)
 
-        x = self.conv5(x)
-        x = self.relu5(x)
+        x = self.conv5_1(x)
+        x = self.bn5_1(x)
+        x = self.relu5_1(x)
+        x = self.conv5_2(x)
+        x = self.bn5_2(x)
+        x = self.relu5_2(x)
+        x = self.conv5_3(x)
+        x = self.bn5_3(x)
+        x = self.relu5_3(x)
         x = self.pool5(x)
 
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
         return x
 
-    def gram_cam_features(self, x):
-        features = []
-
-        x = self.conv1(x)
-        x = self.relu1(x)
-        x = self.pool1(x)
-        features.append(x)
-
-        x = self.conv2(x)
-        x = self.relu2(x)
-        x = self.pool2(x)
-        features.append(x)
-
-        x = self.conv3(x)
-        x = self.relu3(x)
-        features.append(x)
-
-        x = self.conv4(x)
-        x = self.relu4(x)
-        features.append(x)
-
-        x = self.conv5(x)
-        x = self.relu5(x)
-        x = self.pool5(x)
-        features.append(x)
-
-        x = self.avgpool(x)
-        features.append(x)
-
-        return features
 
 def initialize_model():
     pytorch_lightning.seed_everything(2024)
@@ -173,51 +242,54 @@ def initialize_model():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Create AlexNet model with early exits
-    model = BranchedAlexNet(num_classes=10)
+    model = BranchVGG16BN(num_classes=10)
 
     # Load pretrained AlexNet model
-    pretrained_alexnet = models.alexnet(weights=True)
+    pretrained_vgg16bn = models.vgg16_bn(weights=True)
 
-    # Copy the weights from the pretrained AlexNet to your model
-    model.conv1.load_state_dict(pretrained_alexnet.features[0].state_dict())
-    model.conv2.load_state_dict(pretrained_alexnet.features[3].state_dict())
-    model.conv3.load_state_dict(pretrained_alexnet.features[6].state_dict())
-    model.conv4.load_state_dict(pretrained_alexnet.features[8].state_dict())
-    model.conv5.load_state_dict(pretrained_alexnet.features[10].state_dict())
+    # Copy weights from pretrained model to custom model
+    model.conv1_1.load_state_dict(pretrained_vgg16bn.features[0].state_dict())  # conv1_1
+    model.bn1_1.load_state_dict(pretrained_vgg16bn.features[1].state_dict())  # bn1_1
+    model.conv1_2.load_state_dict(pretrained_vgg16bn.features[3].state_dict())  # conv1_2
+    model.bn1_2.load_state_dict(pretrained_vgg16bn.features[4].state_dict())  # bn1_2
+
+    model.conv2_1.load_state_dict(pretrained_vgg16bn.features[7].state_dict())  # conv2_1
+    model.bn2_1.load_state_dict(pretrained_vgg16bn.features[8].state_dict())  # bn2_1
+    model.conv2_2.load_state_dict(pretrained_vgg16bn.features[10].state_dict())  # conv2_2
+    model.bn2_2.load_state_dict(pretrained_vgg16bn.features[11].state_dict())  # bn2_2
+
+    model.conv3_1.load_state_dict(pretrained_vgg16bn.features[14].state_dict())  # conv3_1
+    model.bn3_1.load_state_dict(pretrained_vgg16bn.features[15].state_dict())  # bn3_1
+    model.conv3_2.load_state_dict(pretrained_vgg16bn.features[17].state_dict())  # conv3_2
+    model.bn3_2.load_state_dict(pretrained_vgg16bn.features[18].state_dict())  # bn3_2
+    model.conv3_3.load_state_dict(pretrained_vgg16bn.features[20].state_dict())  # conv3_3
+    model.bn3_3.load_state_dict(pretrained_vgg16bn.features[21].state_dict())  # bn3_3
+
+    model.conv4_1.load_state_dict(pretrained_vgg16bn.features[24].state_dict())  # conv4_1
+    model.bn4_1.load_state_dict(pretrained_vgg16bn.features[25].state_dict())  # bn4_1
+    model.conv4_2.load_state_dict(pretrained_vgg16bn.features[27].state_dict())  # conv4_2
+    model.bn4_2.load_state_dict(pretrained_vgg16bn.features[28].state_dict())  # bn4_2
+    model.conv4_3.load_state_dict(pretrained_vgg16bn.features[30].state_dict())  # conv4_3
+    model.bn4_3.load_state_dict(pretrained_vgg16bn.features[31].state_dict())  # bn4_3
+
+    model.conv5_1.load_state_dict(pretrained_vgg16bn.features[34].state_dict())  # conv5_1
+    model.bn5_1.load_state_dict(pretrained_vgg16bn.features[35].state_dict())  # bn5_1
+    model.conv5_2.load_state_dict(pretrained_vgg16bn.features[37].state_dict())  # conv5_2
+    model.bn5_2.load_state_dict(pretrained_vgg16bn.features[38].state_dict())  # bn5_2
+    model.conv5_3.load_state_dict(pretrained_vgg16bn.features[40].state_dict())  # conv5_3
+    model.bn5_3.load_state_dict(pretrained_vgg16bn.features[41].state_dict())  # bn5_3
+
+    # Fully connected layers
+    model.classifier[0].load_state_dict(pretrained_vgg16bn.classifier[0].state_dict())  # fc1
+    model.classifier[3].load_state_dict(pretrained_vgg16bn.classifier[3].state_dict())  # fc2
+    # model.classifier[6].load_state_dict(pretrained_vgg16bn.classifier[6].state_dict())  # fc3
 
     model = model.to(device)
-
-
-    # Define transforms for data augmentation and normalization
-    # transform_train = transforms.Compose([
-    #     transforms.Resize((224, 224)),  # Resize to 224x224
-    #     transforms.RandomCrop(224, padding=4),
-    #     transforms.RandomHorizontalFlip(),
-    #     transforms.RandomRotation(degrees=15),
-    #     transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-    #     transforms.ToTensor(),
-    #     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    # ])
-    #
-    # transform_test = transforms.Compose([
-    #     transforms.Resize((224, 224)),  # Resize to 224x224
-    #     transforms.ToTensor(),
-    #     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    # ])
-    #
-    # full_trainset = torchvision.datasets.CIFAR10(root='D:/Study/Module/Master Thesis/dataset/CIFAR10', train=True,
-    #                                              download=True, transform=transform_train)
-    # trainset, valset = torch.utils.data.random_split(full_trainset, [40000, 10000])
-    # trainloader = torch.utils.data.DataLoader(trainset, batch_size=100, shuffle=True, num_workers=2)
-    # valloader = torch.utils.data.DataLoader(valset, batch_size=256, shuffle=False, num_workers=2)
-    #
-    # testset = torchvision.datasets.CIFAR10(root='D:/Study/Module/Master Thesis/dataset/CIFAR10', train=False,
-    #                                        download=True, transform=transform_test)
-    # testloader = torch.utils.data.DataLoader(testset, batch_size=256, shuffle=False, num_workers=2)
+    model = nn.DataParallel(model)
 
     root = '/home/yibo/PycharmProjects/Thesis/CIFAR10'
     dataprep = Data_prep_224_normal_N(root)
-    trainloader, valloader, testloader = dataprep.create_loaders(batch_size=100, num_workers=2)
+    trainloader, valloader, testloader = dataprep.create_loaders(batch_size=32, num_workers=8)
 
     return model, device, trainloader, valloader, testloader
 
@@ -246,7 +318,7 @@ def train(num_epochs):
 
         for i, data in enumerate(trainloader):
             inputs, labels = data[0].to(device), data[1].to(device)
-
+            # print(i)
             optimizer.zero_grad()
 
             main_out, exit1_out, exit2_out, exit3_out, exit4_out, exit5_out = model(inputs)
@@ -356,17 +428,15 @@ def train(num_epochs):
         print(f"Time per epoch: {int(epoch_hours)}h {int(epoch_minutes)}m {int(epoch_seconds)}s")
 
 
-        #save every 10 epochs
+        #save
         if (epoch + 1) % 5 == 0:
             torch.save(model.state_dict(),
-                       f'D:/Study/Module/Master Thesis/trained_models/B-Alex_cifar10_epoch_{epoch + 1}.pth')
+                       f'/home/yibo/PycharmProjects/Thesis/training_weights/Vgg16bn_ee'
+                       f'/Vgg16bn_ee_small_epoch_{epoch + 1}.pth')
 
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f"Training completed in: {elapsed_time // 60:.0f}m {elapsed_time % 60:.0f}s")
-
-    # Save the trained model
-    torch.save(model.state_dict(), 'D:/Study/Module/Master Thesis/trained_models/B-Alex_cifar10.pth')
 
     # Plotting the losses
     epoch = range(1, len(train_losses) + 1)
@@ -464,31 +534,6 @@ def test():
           f"Exit 3 Accuracy: {exit3_accuracy:.2f}%, Exit 4 Accuracy: {exit4_accuracy:.2f}%, "
           f"Exit 5 Accuracy: {exit5_accuracy:.2f}%")
 
-# def play_sound():
-#     for _ in range(10):
-#         winsound.PlaySound("SystemHand", winsound.SND_ALIAS)
-
-def show_images_from_valloader(valloader, num_images=10):
-    import matplotlib.pyplot as plt
-    import numpy as np
-
-    # Get a batch of validation images
-    for images, labels in valloader:
-        break
-
-    # Show images
-    fig, axes = plt.subplots(1, num_images, figsize=(15, 15))
-    for idx in range(num_images):
-        ax = axes[idx]
-        img = images[idx] / 2 + 0.5  # unnormalize
-        npimg = img.numpy()
-        ax.imshow(np.transpose(npimg, (1, 2, 0)))
-        ax.axis('off')
-        ax.set_title(f'Label: {labels[idx].item()}')
-
-    plt.show()
-
-
 if __name__ == '__main__':
 
     model, device, trainloader, valloader, testloader = initialize_model()
@@ -499,9 +544,10 @@ if __name__ == '__main__':
 
     TRAIN = False
     if TRAIN:
-        train(50)
+        train(20)
         test()
     else:
-        model.load_state_dict(torch.load(r"/home/yibo/PycharmProjects/Thesis/weights/B-Alex final/B-Alex_cifar10.pth", weights_only=True))
+        model.load_state_dict(torch.load(r"weights/Vgg16bn_ee_224/Vgg16bn_epoch_15.pth", weights_only=True))
         test()
-        show_images_from_valloader(valloader)
+        # show_images_from_valloader(valloader)
+
