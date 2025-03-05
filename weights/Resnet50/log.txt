@@ -1,0 +1,6 @@
+Test Loss: 0.6193, Test Accuracy: 96.50%, Exit 1 Accuracy: 67.39%, Exit 2 Accuracy: 76.58%, Exit 3 Accuracy: 92.53%, Exit 4 Accuracy: 96.40%  
+simple_inference accuracy: [67.39, 76.58, 92.53, 96.4, 96.5]
+optimal Thresholds already found: [0.3, 0.45, 0.7, 0.05]
+---------------------------------
+threshold_inference Accuracy: [96.51785714285714, 96.8141592920354, 96.57829141173805, 96.84106614017769, 71.83098591549296]
+threshold_inference Exit Ratios: [22.4, 16.95, 44.13, 10.13, 6.39]

@@ -1,4 +1,4 @@
-import pytorch_lightning
+import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -574,6 +574,7 @@ def ee_inference():
 
 if __name__ == '__main__':
 
+    pl.seed_everything(2024)
     model, device, trainloader, valloader, testloader = initialize_model()
 
     model = nn.DataParallel(model, device_ids=[0, 1, 2, 3])

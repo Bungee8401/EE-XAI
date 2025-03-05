@@ -201,11 +201,14 @@ def centered_l1_loss(pred, target, center_weight):
     return torch.mean(mask * torch.abs(pred - target))
 
 def compute_loss(model, generated, original_img, target_label):
-    # 早退损失（假设第一个退出点的置信度）
-    main_out, exit1_out, exit2_out, exit3_out, exit4_out, exit5_out = classifier(generated)
-    # main_out, exit1_out, exit2_out, exit3_out, exit4_out = classifier(generated)
-    exit_confidences = compute_entropy_5(exit1_out, exit2_out, exit3_out, exit4_out, exit5_out)
-    # exit_confidences = compute_entropy_4(exit1_out, exit2_out, exit3_out, exit4_out)
+    # 早退损失
+    if classifier_name == 'B_alex' or classifier_name == 'B_Vgg16':
+        main_out, exit1_out, exit2_out, exit3_out, exit4_out, exit5_out = classifier(generated)
+        exit_confidences = compute_entropy_5(exit1_out, exit2_out, exit3_out, exit4_out, exit5_out)
+    elif classifier_name == 'B_Resnet50':
+        main_out, exit1_out, exit2_out, exit3_out, exit4_out = classifier(generated)
+        exit_confidences = compute_entropy_4(exit1_out, exit2_out, exit3_out, exit4_out)
+
     exit_loss = torch.mean(exit_confidences)  # the mean of first exit's confidence, min it -> encourage early exit
 
     # 分类损失（最终层输出）
@@ -295,7 +298,7 @@ def train(num_epoch):
 
         if not os.path.exists(r"/home/yibo/PycharmProjects/Thesis/training_weights/Generator224"):
                 os.makedirs(r"/home/yibo/PycharmProjects/Thesis/training_weights/Generator224")
-        if (epoch+1) % 50 == 0:
+        if (epoch+1) % 20 == 0:
             torch.save(generator.state_dict(),
                     f"/home/yibo/PycharmProjects/Thesis/training_weights/Generator224/Generator_epoch_{epoch+1}.pth")
 
@@ -314,10 +317,14 @@ def test(batch, num):
             original_images, original_labels = data[0].to(device), data[1].to(device)
             original_images_crop = crop_img(original_images)
 
+            if WHITE_BOARD_TEST:
+                original_images.fill_(0)
+
             # print(original_images.max(), original_images.min(), original_images.mean())
 
             thresholds = [0.7, 0.8, 1.0, 0.8, 0.7]
-            classified_label, original_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, original_images,
+            # thresholds = [0, 0.8, 1.0, 0.8, 0.7]
+            classified_label, original_exit = Resnet50_ee.threshold_inference_new(classifier, 0, original_images,
                                                                                     thresholds)
 
             generated_images = generator(original_images)
@@ -342,14 +349,14 @@ def test(batch, num):
             # original_images_copy[:,:, only_edge: -only_edge, only_edge: -only_edge] = 2*generated_images_crop[:,:, only_edge: -only_edge, only_edge: -only_edge]
             # generated_images_crop = original_images_copy
 
-            classified_label_gen, generated_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, generated_images_crop,
+            classified_label_gen, generated_exit = Resnet50_ee.threshold_inference_new(classifier, 0, generated_images_crop,
                                                                                       thresholds)
 
             print(f"Original Image - label: {classified_label}, \n Exit Location: {original_exit}")
             print(f"Generated Image - label: {classified_label_gen}, \n Exit Location: {generated_exit}")
 
-            num_forced_class_original += (classified_label == 3).sum().item()
-            num_forced_class_generated += (classified_label_gen == 3).sum().item()
+            num_forced_class_original += (classified_label == category).sum().item()
+            num_forced_class_generated += (classified_label_gen == category).sum().item()
 
 
             # Show the original and generated images
@@ -376,8 +383,8 @@ def test(batch, num):
                 plt.imshow(out2_normalized)
                 plt.show()
 
-        print(f"Number of 3s in Original Labels: {num_forced_class_original}")
-        print(f"Number of 3s in Generated Labels: {num_forced_class_generated}")
+        print(f"Number of {category}s in Original Labels: {num_forced_class_original}")
+        print(f"Number of {category}s in Generated Labels: {num_forced_class_generated}")
 
 def gen_dataset(generator, trainloader, valloader, testloader):
 
@@ -519,7 +526,7 @@ def test_gen_dataset(testset_path, valset_path):
             cropped_imgs = crop_img(imgs)
 
             # Evaluate the model on the train and validation datasets
-            trainset_label, trainset_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, cropped_imgs,
+            trainset_label, trainset_exit = Resnet50_ee.threshold_inference_new(classifier, 0, cropped_imgs,
                                                                                         [0.7, 0.8, 1.0, 0.8, 0.7])
             trainset_labels.append(trainset_label)
             trainset_exits.append(trainset_exit)
@@ -528,7 +535,7 @@ def test_gen_dataset(testset_path, valset_path):
             imgs, _ = data[0].to(device), data[1].to(device)
             cropped_imgs = crop_img(imgs)
 
-            valset_label, valset_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, cropped_imgs,
+            valset_label, valset_exit = Resnet50_ee.threshold_inference_new(classifier, 0, cropped_imgs,
                                                                                 [0.7, 0.8, 1.0, 0.8, 0.7])
             valset_labels.append(valset_label)
             valset_exits.append(valset_exit)
@@ -536,7 +543,7 @@ def test_gen_dataset(testset_path, valset_path):
         for idx, data in enumerate(testloader):
             imgs, _ = data[0].to(device), data[1].to(device)
             cropped_imgs = crop_img(imgs)
-            ori_trainset_label, ori_trainset_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, imgs,
+            ori_trainset_label, ori_trainset_exit = Resnet50_ee.threshold_inference_new(classifier, 0, imgs,
                                                                                 [0.7, 0.8, 1.0, 0.8, 0.7])
 
             ori_trainset_labels.append(ori_trainset_label)
@@ -545,7 +552,7 @@ def test_gen_dataset(testset_path, valset_path):
         for idx, data in enumerate(valloader):
             imgs, _ = data[0].to(device), data[1].to(device)
             cropped_imgs = crop_img(imgs)
-            ori_valset_label, ori_valset_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, imgs,
+            ori_valset_label, ori_valset_exit = Resnet50_ee.threshold_inference_new(classifier, 0, imgs,
                                                                             [0.7, 0.8, 1.0, 0.8, 0.7])
 
             ori_valset_labels.append(ori_valset_label)
@@ -579,7 +586,7 @@ def test_gen_dataset(testset_path, valset_path):
 
 def initialize_model(classifier_name):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    pl.seed_everything(2024)
+
 
     if classifier_name == 'B_alex':
         classifier = BranchedAlexNet()
@@ -587,36 +594,33 @@ def initialize_model(classifier_name):
             torch.load(r"/home/yibo/PycharmProjects/Thesis/weights/B-Alex final/B-Alex_cifar10.pth", weights_only=True))
 
         classifier.to(device)
+        classifier.eval()
 
     elif classifier_name == 'B_Vgg16':
         classifier = BranchVGG16BN()
         classifier.to(device)
         classifier = nn.DataParallel(classifier, device_ids=[0, 1, 2, 3])
         classifier.load_state_dict(torch.load(r"weights/Vgg16bn_ee_224/Vgg16bn_epoch_15.pth", weights_only=True))
-
+        classifier.eval()
 
     elif classifier_name == 'B_Resnet50':
         classifier = BranchedResNet50()
         classifier.to(device)
         classifier = nn.DataParallel(classifier, device_ids=[0, 1, 2, 3])
-        classifier.load_state_dict(
-            torch.load(r"weights/Resnet50/B-Resnet50_epoch_10.pth", weights_only=True))
-
-
+        classifier.load_state_dict(torch.load(r"weights/Resnet50/B-Resnet50_epoch_10.pth", weights_only=True))
+        classifier.eval()
 
     # get airplane/etc class index
     root = '/home/yibo/PycharmProjects/Thesis/CIFAR10'
     dataprep = Data_prep_224_gen(root)
-    train_idx, val_idx, test_idx = dataprep.get_category_index(category=3)  # 0 airplane, 3 cat, 8 ship
+    train_idx, val_idx, test_idx = dataprep.get_category_index(category=category)  # 0 airplane, 3 cat, 8 ship
     # print(f"Total entries in train_idx: {len(train_idx)}, val_idx: {len(val_idx)}, test_idx: {len(test_idx)}")
-    trainloader, valloader, testloader = dataprep.create_catogery_loaders(batch_size=100, num_workers=2,
+    trainloader, valloader, testloader = dataprep.create_catogery_loaders(batch_size=128, num_workers=2,
                                                                           train_idx=train_idx, val_idx=val_idx,
                                                                           test_idx=test_idx)
 
     generator = Generator().to(device)
     generator = nn.DataParallel(generator, device_ids=[0, 1, 2, 3])
-    # generator.load_state_dict(torch.load('weights/Generator224/alex/Generator_200_airplane_tanh.pth', weights_only=True))
-    generator.load_state_dict(torch.load('training_weights/Generator224/Generator_epoch_50.pth', weights_only=True))
 
     return generator, classifier, device, trainloader, valloader, testloader
 
@@ -625,18 +629,27 @@ if __name__ == "__main__":
     # B_alex Alex_ee_inference
     # B_Vgg16 Vgg16_ee_inference
     # B_Resnet50 Resnet50_ee
-    generator, classifier, device, trainloader, valloader, testloader = initialize_model(classifier_name = 'B_Vgg16')
-
-    optimizer = optim.Adam(generator.parameters(), lr=1e-3)
+    pl.seed_everything(2024)
 
     crop_size = 0
     replace_size = 0
     only_edge = 0
+    WHITE_BOARD_TEST = False
+    TRAIN = False
+    classifier_name = "B_Resnet50"
+    category = 3 # 0 Airplane, 1 Automobile, 2 Bird, 3 Cat, 4 Deer, 5 Dog, 6 Frog, 7 Horse, 8 Ship, 9 Truck
 
-    # train(200)
+    generator, classifier, device, trainloader, valloader, testloader = initialize_model(classifier_name)
+    optimizer = optim.Adam(generator.parameters(), lr=1e-3)
+
+    if TRAIN:
+        train(200)
+    else:
+        # generator.load_state_dict(torch.load('weights/Generator224/vgg/Generator_epoch_50_ship.pth', weights_only=True))
+        generator.load_state_dict(torch.load('training_weights/Generator224/Generator_epoch_60.pth', weights_only=True))
+
     test(5, 2)  # test n imgs per batch of testloader; in total 4n~5n imgs
     gen_dataset(generator, trainloader, valloader, testloader)
     # display_gen_dataset('data_split/generated_CIFAR224_test.pkl', 'data_split/generated_CIFAR224_val.pkl', 10)
     test_gen_dataset('data_split/generated_CIFAR224_test.pkl', 'data_split/generated_CIFAR224_val.pkl')
-
 

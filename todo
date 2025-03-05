@@ -117,3 +117,150 @@ Details:
 
     b) for now, edgy pattern seems not sensitive to Grad CAM
         - furthur test needed
+
+------------------ 20.Feb 2025 ----------------------
+
+I took some days off to consider the PhD offer and relax. Kingdom Come Deliverance 2 is such a good game!
+
+
+Things I need to do today:
+
+1. review whats been done
+    Generator224, cats can be classified correctly and exit early -> a few pictures
+    Grad-CAM, cropping, to test the edge -> results list
+
+2. whats next?
+    furthur testing, replace edge pixels to white, black, etc to see influence
+
+3. try to prove that,
+    EE features are not changable and transferable
+    they exist in the pictures for sure, but highly relatable to objects
+
+4. convince that I start to implement everything on RISC-V
+
+
+
+Reports:
+
+1. brief review
+    BranchAlexnet
+    Generator224
+    Grad-CAM
+
+2. now in EE feature verification
+    crop & replace
+        -> significantly influence the EE position and classification acc
+        examples:
+            1) crop from 0-20;
+            2) replace from 0-20;
+            3) replace & crop also applied to original image
+                cropping from 30 above is unsafe.
+
+    cross class test
+        -> even trained with cat/airplane, generator224 can still force other class into cat/airplane
+
+    tests can conclude:
+        Entropy early-exit criteria in classifier, is probably not suitable for measuring loss
+        Shortcut learning, deceives the classifier, may contain the EE features
+        new methods needs to bring back the generator model to the object, instead of irrelevant backgrounds
+
+4. What could be done later
+    Transformer + Attention model to try to generate real EE features
+    BUT! the best we can expect, is that the model can modify some local parts of an img to make it exit early
+           e.g. in cat, fur texture, eyes, face texture etc.
+
+    -> which means, pictures cannot exit early without a certain change in some parts
+
+
+------------------26.02 Feb 2025---------------------
+
+Prove that, why generator224 is not really capturing the real EE features of an object
+    -> whether an object can EE or not, depends mostly on the edge now
+
+
+1. feed only edge
+    center part is left only white/black/gray
+    result analysis: (train on 0, test on 8)
+
+    - exit mainly at 5
+    - img has to exit the network at 5th exit point, meaning only the edge is not enough for the classifier
+    - in Branch Alexnet, the main exit's acc is around 55% in trainset, 33% in validation set
+    - exit at earlier location means, the classifier believes it has at least
+            [87.81, 86.35, 74.49, 69.43, 71.68, 33.65] acc to be correct
+
+2. subtract ori and gen
+    not analyzable. no pattern found
+
+
+------------------27.02 Feb 2025---------------------
+
+1. replace sigmoid to tanh in generator last layer
+    [0,1] -> [-1, 1]
+    gen_imgs show to be exibit less edgy patterns and preserve EE, label correction
+
+2. newly trained cat generator seem to behave more stably in background
+    - label correction ability comes from GAN's classifier, where I have cls_loss in the loss_fuction
+
+    - label correction may not fundamentally improve the classifier's performance on cat class,
+        it could only found some close pattern to cat class
+
+    - feed other 9 class to Generator 3, the "label correction" performance varies
+        meaning, very likely, that those classes affected the most,
+            have similar features after the conv1 layer
+            e.g., cat & dog, cat & deer, etc
+
+3. the diff
+    - diff has a clear cat, alwasy result in a better exit location
+
+
+------------------02.03 Feb 2025---------------------
+
+Generator224 with VGG16
+- gen_imgs all have the same cat structure, still short cut learning
+
+Generator224 with Resnet50
+- not working properly
+
+GradCAM set up, read some tutorials of Captum
+
+TODO: use mask to control the generator
+
+------------------03.03 Feb 2025---------------------
+
+Meeting
+- recent work report
+- controlled region update in generator
+- possible PhDs suggestions
+
+        1. 在德国读博体验如何，跟硕士有什么不同
+        2. 达姆，或者说黑森AI的平台怎么样
+        3. AI赛道变化很快如何适应
+        4. 你对云端AI 和 边缘AI的看法
+
+
+------------------04.03 Feb 2025---------------------
+could do:
+1. threshold inference in training
+2. now we are early exit, what if we use late exit?
+3. loss function design
+
+problem:
+1. resnet50 as classifier not working, no convergence at all
+
+findings:
+1. each class has a "cheat" pattern
+2. white board image can also generate cheat pattern
+3. cheat pattern is, in fact, what the generator learnt from the classifier
+4. classifier siginificantly influence the generator's output
+5. the generator is actually learning from the classifier
+6. a better classifier/feature_extractor, a better generator?
+
+------------------05.03 Feb 2025---------------------
+todo:
+    0. test vgg white board with resnet50 and alexnet
+    1. loss function redesign
+    2. threshold inference
+    3. late exit
+    4. mask control
+
+
