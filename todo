@@ -263,4 +263,76 @@ todo:
     3. late exit
     4. mask control
 
+1. resnet50 cannot classify cat class until exit 2
 
+    - exit 2
+    Number of 3s in Original Labels: 539
+    Number of 3s in Generated Labels: 640
+
+    negative count: 0 of 512
+    positive count: 458 of 512
+    maintain count: 54 of 512
+
+    - exit 3
+    Number of 3s in Original Labels: 587
+    Number of 3s in Generated Labels: 640
+
+    negative count: 0 of 512
+    positive count: 458 of 512
+    maintain count: 54 of 512
+
+2. both vgg16 and resnet50 are generating a specific pattern for one class
+
+3. add gradcam into generator training process
+    - gradcam(gen_img) -> not working
+    - gradcam(ori_img) -> should be working
+
+4. sim_loss may need to be removed (or compare the gen with ori, not masked_ori)
+
+
+------------------07.03 Feb 2025---------------------
+
+1. all class failed.
+    - can exit early, but cannot classify correctly
+    - good news is, we do find a universal early exit pattern to let the image exit early
+    - theoretically, if a classifier can classify the image in an early stage, this finding might be useful
+    - "in an early stage", varies from classifier to classifier.
+    - for vgg16, is exit 3; for others, tests needed
+
+Reports:
+    1. vgg16, resnet50
+        vgg16 works, resnet50 not for reasons unkown
+        vgg16 results, the generator learnt a unique pattern for each class
+        resnet results
+        white board test
+
+    2. gradcam in generator training process
+        mask used in training to reduce the edge noise (emphasize the important feature)
+        gen = generator (mask * ori); label, exit = classifier(gen) -> less edge noise
+            &
+        gen = generator(ori);  label, exit = classifier(mask * gen) -> no convergence
+
+    3. all class training
+        - can exit early, but cannot classify correctly
+        - good news is, we do find a universal early exit pattern to let the image exit early
+        - theoretically, if a classifier can classify the image in an early stage, this finding might be useful
+        - "in an early stage", varies from classifier to classifier.
+        - for vgg16, is exit 3; for others, tests needed
+
+        - also, disk is full.
+
+    4. conclusion
+        - whatever the generator is fed, it always trying to find a fix pattern that can decreasing the loss function
+            - one class, one pattern that looks alike the class
+            - multiple class, also just one pattern, but doesnt look like any class to human eyes
+
+        - even if we have the all class generator, e.g. ViT, which can gen correct label and early exit,
+            its still essentially insert/replace certain pixels to "cheat" the classifier on early stage
+            -> it will still highly
+
+        - there's no guarantee that
+
+    5. Furthur research if willingly
+        - try only combine some classes, to see the generated pattern
+            similar classes, i.e., cat & dog, car & truck
+            different classes, i.e.,  ship & bird
