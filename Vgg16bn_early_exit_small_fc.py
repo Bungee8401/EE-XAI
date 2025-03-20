@@ -291,6 +291,7 @@ def initialize_model():
     dataprep = Data_prep_224_normal_N(root)
     trainloader, valloader, testloader = dataprep.create_loaders(batch_size=32, num_workers=8)
 
+
     return model, device, trainloader, valloader, testloader
 
 def train(num_epochs):

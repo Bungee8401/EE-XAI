@@ -10,6 +10,56 @@ from torchvision.models import resnet50
 import time
 from CustomDataset import Data_prep_224_normal_N
 
+class ResNet50(nn.Module):
+    def __init__(self, num_classes=10):
+        super(ResNet50, self).__init__()
+        self.num_classes = num_classes
+
+        # Load the pretrained ResNet50 model
+        resnet = models.resnet50(weights=True)
+
+        # Extract layers from the pretrained ResNet50 model
+        self.conv1 = resnet.conv1
+        self.bn1 = resnet.bn1
+        self.relu = resnet.relu
+        self.maxpool = resnet.maxpool
+        self.layer1 = resnet.layer1
+        self.layer2 = resnet.layer2
+        self.layer3 = resnet.layer3
+        self.layer4 = resnet.layer4
+        self.avgpool = resnet.avgpool
+
+        # Main classifier
+        self.fc = nn.Linear(resnet.fc.in_features, num_classes)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.avgpool(x)
+
+        x = torch.flatten(x, 1)
+        out_main = self.fc(x)
+
+        return out_main
+
+    def extract_features(self, x):
+            x = self.conv1(x)
+            x = self.bn1(x)
+            x = self.relu(x)
+            x = self.maxpool(x)
+
+            x = self.avgpool(x)
+            x = torch.flatten(x, 1)
+
+            return x
+
 class BranchedResNet50(nn.Module):
     def __init__(self, num_classes=10):
         super(BranchedResNet50, self).__init__()
@@ -98,7 +148,7 @@ class BranchedResNet50(nn.Module):
 
 def initialize_model():
 
-    pytorch_lightning.seed_everything(2024)
+    pl.seed_everything(2024)
     # Check for GPU availability
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

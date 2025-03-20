@@ -336,3 +336,70 @@ Reports:
         - try only combine some classes, to see the generated pattern
             similar classes, i.e., cat & dog, car & truck
             different classes, i.e.,  ship & bird
+
+
+
+------------------12.03 Feb 2025---------------------
+
+1. binary round mask * images -> generator training
+    - train with L1 loss    results not ideal, noises too large
+    - train without L1      absolutely not, have to use L1
+
+2. debug test_gen_dataset
+
+
+------------------13.03 Feb 2025---------------------
+
+new idea:
+0. masked_img mostly exit later than original img
+    -> the surroundings of an image is important for EE
+
+1. use modified cifar10 dataset to train the generator (masked_img now)
+    -> still only learn the fixed cheat pattern
+
+2. train D and G together with masked img
+    -> trying now, hard to converge
+    - but we can expect gen_imgs only change the masked part
+
+------------------16.03 Feb 2025---------------------
+
+new idea:
+
+1. VAE to search for EE images, then analyze the reason behind
+
+    because: GAN network is hard to train, only changing a part of the image is hard to implement (why? sounds easy)
+    therefore: use VAE for only one class; first generate, then search images that can EE
+
+    result: training now.
+
+
+
+------------------17.03 Feb 2025---------------------
+
+1. VAE has results, search can be done later
+
+2. GAN not converging, give up
+
+
+------------------19.03 Feb 2025---------------------
+
+meeting:
+    1. results
+    2. thesis format
+        what should be in thesis
+        format, template
+        page requirements
+        ddl of submission & defense date
+
+possible could-try things:
+
+    1. disable 1st exit, train, see if the pattern changes
+        (then 2nd, 3rd, basically you are trying to generate diff layers' features
+
+    2. sample VAE's latent space,
+
+    3. look for pics that match the learnt class pattern, test the EE condition
+
+
+
+

@@ -5,6 +5,9 @@ import torch.nn.functional as F
 import numpy as np
 import os
 import torch.optim as optim
+import torchvision.models as models
+from sympy import false
+from torchvision.models.quantization import resnet50
 import Alex_ee_inference
 import Vgg16_ee_inference
 import Resnet50_ee
@@ -12,12 +15,16 @@ from Alexnet_early_exit import BranchedAlexNet
 from Vgg16bn_early_exit_small_fc import BranchVGG16BN
 from Resnet50_ee import BranchedResNet50
 import matplotlib.pyplot as plt
-from CustomDataset import Data_prep_224_gen
+from CustomDataset import Data_prep_224_gen, MaskedDataset
 import datetime
 from tqdm import tqdm
 import pickle
 import random
 from torch.utils.data import DataLoader, TensorDataset
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+from pytorch_grad_cam.utils.image import show_cam_on_image
+
 
 # class Generator(nn.Module):
 #     def __init__(self):
@@ -190,6 +197,88 @@ class Generator(nn.Module):
         out = self.dec5(d4)  # 112 -> 224
         return out
 
+class ResNet_50(nn.Module):
+    def __init__(self, num_classes=10):
+        super(ResNet_50, self).__init__()
+        self.num_classes = num_classes
+
+        # Load the pretrained ResNet50 model
+        resnet = models.resnet50(weights=None)
+
+        # Extract layers from the pretrained ResNet50 model
+        self.conv1 = resnet.conv1
+        self.bn1 = resnet.bn1
+        self.relu = resnet.relu
+        self.maxpool = resnet.maxpool
+        self.layer1 = resnet.layer1
+        self.layer2 = resnet.layer2
+        self.layer3 = resnet.layer3
+        self.layer4 = resnet.layer4
+        self.avgpool = resnet.avgpool
+
+        # Main classifier
+        self.fc = nn.Linear(resnet.fc.in_features, num_classes)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.avgpool(x)
+
+        x = torch.flatten(x, 1)
+        out_main = self.fc(x)
+
+        return out_main
+
+    def extract_features(self, x):
+            x = self.conv1(x)
+            x = self.bn1(x)
+            x = self.relu(x)
+            x = self.maxpool(x)
+
+            x = self.avgpool(x)
+            x = torch.flatten(x, 1)
+
+            return x
+
+def img_norm(img):
+    min_val = torch.min(img)
+    max_val = torch.max(img)
+    img = (img - min_val) / (max_val - min_val)
+    return img
+
+def load_data(file_path):
+        with open(file_path, "rb") as f:
+            data = pickle.load(f)
+        return data
+
+def crop_img(imgs):
+    if crop_size != 0 and replace_size == 0:  # crop
+        cropped_imgs = imgs[:, :, crop_size:-crop_size, crop_size:-crop_size]  # [B, C, 184, 184]
+        final_imgs = torch.nn.functional.interpolate(cropped_imgs, size=(224, 224), mode="bilinear",
+                                                     align_corners=False)
+    elif crop_size == 0 and replace_size != 0:  # replace
+        processed_imgs = imgs.clone()
+        processed_imgs[:, :, :replace_size, :] = 1  # Replace top edge
+        processed_imgs[:, :, -replace_size:, :] = 1  # Replace bottom edge
+        processed_imgs[:, :, :, :replace_size] = 1  # Replace left edge
+        processed_imgs[:, :, :, -replace_size:] = 1  # Replace right edge
+        final_imgs = processed_imgs
+    # elif crop_size == 0 and replace_size == 0 and only_edge != 0:
+    #     processed_imgs = imgs.clone()
+    #     processed_imgs[:, :, only_edge:-only_edge, only_edge:-only_edge] = 0
+    #     final_imgs =  processed_imgs
+
+    else:
+        final_imgs = imgs
+
+    return final_imgs
 
 def centered_l1_loss(pred, target, center_weight):
     # 创建中心加权的mask（例如：高斯权重）
@@ -266,6 +355,59 @@ def compute_entropy_4(exit1_out, exit2_out, exit3_out, exit4_out):
 
     return torch.stack([entropy_exit1, entropy_exit2, entropy_exit3, entropy_exit4], dim=0)
 
+def grad_cam_mask(label, images):
+
+    # 1. captum
+    # layer_gradcam = LayerGradCam(resnet_for_cam, resnet_for_cam.module.layer4[2].conv3) # Resnet50
+    # attributions_lgc = layer_gradcam.attribute(images, target=label)
+    # upsamp_attr_lgc = LayerAttribution.interpolate(attributions_lgc, images.shape[2:])
+    # return upsamp_attr_lgc
+
+    # 2. pytorch_grad_cam
+    cam = GradCAM(model=resnet_for_cam, target_layers=[resnet_for_cam.module.layer4[-1]])
+    masked_images = torch.zeros_like(images)
+    for idx in range(images.shape[0]):
+        input_tensor = images[idx].unsqueeze(0)  # Add batch dimension back
+        target = ClassifierOutputTarget(label[idx].item())
+
+        # Generate GradCAM
+        grayscale_cam = cam(input_tensor=input_tensor, targets=[target])
+        grayscale_cam = torch.from_numpy(grayscale_cam[0]).to(device)  # Convert to tensor and move to GPU
+
+        # Apply GradCAM mask directly to the original image
+
+        masked_img = img_norm(input_tensor).squeeze(0) * grayscale_cam.unsqueeze(0)  # Add channel dimension to mask
+
+        # Normalize the masked image
+        masked_img = (masked_img - masked_img.min()) / (masked_img.max() - masked_img.min())
+
+        # Store in output tensor
+        masked_images[idx] = masked_img
+
+        # if idx < 10:
+        #     plt.figure(figsize=(15, 5))
+        #
+        #     # Original image
+        #     plt.subplot(1, 3, 1)
+        #     orig_img = input_tensor.squeeze(0).cpu().permute(1, 2, 0).numpy()
+        #     orig_img = (orig_img - orig_img.min()) / (orig_img.max() - orig_img.min())
+        #     plt.imshow(orig_img)
+        #     plt.title(f'Original Image {idx}')
+        #
+        #     # GradCAM mask
+        #     plt.subplot(1, 3, 2)
+        #     plt.imshow(grayscale_cam.cpu().numpy(), cmap='jet')
+        #     plt.title(f'GradCAM Mask {idx}')
+        #
+        #     # Masked image
+        #     plt.subplot(1, 3, 3)
+        #     masked_viz = masked_img.cpu().permute(1, 2, 0).numpy()
+        #     plt.imshow(masked_viz)
+        #     plt.title(f'Masked Image {idx}')
+        #
+        #     plt.show()
+    return masked_images
+
 def train(num_epoch):
     generator.train()
     loss_log_path = r"/home/yibo/PycharmProjects/Thesis/training_weights/Generator224/log.txt"
@@ -275,7 +417,6 @@ def train(num_epoch):
     for epoch in range(num_epoch):
         for idx, data in enumerate(trainloader):
             original_images, original_labels = data[0].to(device), data[1].to(device)
-
             optimizer.zero_grad()
 
             generated_images = generator(original_images)
@@ -284,7 +425,6 @@ def train(num_epoch):
             loss.backward()
             optimizer.step()
 
-            # Accumulate the loss for the current batch
             epoch_loss += loss.item()
             num_batches += 1
 
@@ -298,9 +438,10 @@ def train(num_epoch):
 
         if not os.path.exists(r"/home/yibo/PycharmProjects/Thesis/training_weights/Generator224"):
                 os.makedirs(r"/home/yibo/PycharmProjects/Thesis/training_weights/Generator224")
-        if (epoch+1) % 20 == 0:
+        if (epoch+1) % 10 == 0:
             torch.save(generator.state_dict(),
                     f"/home/yibo/PycharmProjects/Thesis/training_weights/Generator224/Generator_epoch_{epoch+1}.pth")
+            test(5,2)
 
 def test(batch, num):
     generator.eval()
@@ -322,9 +463,7 @@ def test(batch, num):
 
             # print(original_images.max(), original_images.min(), original_images.mean())
 
-            thresholds = [0.7, 0.8, 1.0, 0.8, 0.7]
-            # thresholds = [0, 0.8, 1.0, 0.8, 0.7]
-            classified_label, original_exit = Resnet50_ee.threshold_inference_new(classifier, 0, original_images,
+            classified_label, original_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, original_images,
                                                                                     thresholds)
 
             generated_images = generator(original_images)
@@ -349,7 +488,7 @@ def test(batch, num):
             # original_images_copy[:,:, only_edge: -only_edge, only_edge: -only_edge] = 2*generated_images_crop[:,:, only_edge: -only_edge, only_edge: -only_edge]
             # generated_images_crop = original_images_copy
 
-            classified_label_gen, generated_exit = Resnet50_ee.threshold_inference_new(classifier, 0, generated_images_crop,
+            classified_label_gen, generated_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, generated_images_crop,
                                                                                       thresholds)
 
             print(f"Original Image - label: {classified_label}, \n Exit Location: {original_exit}")
@@ -423,6 +562,48 @@ def gen_dataset(generator, trainloader, valloader, testloader):
 
     process_and_save_data(testloader, 'data_split/generated_CIFAR224_test.pkl', "generated_CIFAR224_test")
 
+def create_masked_dataset(class_number):
+    def process_and_save_data(dataloader, save_path, dataset_name):
+        generated_images = []
+        labels = []
+
+        print(f"Generating images for {dataset_name} dataset...")
+
+        for images, batch_labels in tqdm(dataloader, desc=f"Processing {dataset_name}"):
+            images = images.to(device)
+            batch_labels = batch_labels.to(device)
+
+            masked_imgs = grad_cam_mask(batch_labels, images)
+            # Move data to CPU for saving
+            generated_images.append(masked_imgs.cpu())
+            labels.append(batch_labels.detach().cpu())
+
+        # Concatenate tensors to create a single dataset
+        generated_images = torch.cat(generated_images, dim=0)
+        labels = torch.cat(labels, dim=0)
+
+        # Save to .pkl file
+        with open(save_path, "wb") as f:
+            pickle.dump({"images": generated_images, "labels": labels}, f)
+
+        print(f"Saved {dataset_name} dataset to {save_path} with {len(generated_images)} samples")
+
+    # get airplane/etc class index
+    root = '/home/yibo/PycharmProjects/Thesis/CIFAR10'
+    dataprep = Data_prep_224_gen(root)
+
+    train_idx, val_idx, test_idx = dataprep.get_category_index(category=class_number)  # 0 airplane, 3 cat, 8 ship
+    # print(f"Total entries in train_idx: {len(train_idx)}, val_idx: {len(val_idx)}, test_idx: {len(test_idx)}")
+    trainloader, valloader, testloader = dataprep.create_catogery_loaders(batch_size=128, num_workers=2,
+                                                                          train_idx=train_idx, val_idx=val_idx,
+                                                                          test_idx=test_idx)
+    print("Generating masked datasets...")
+
+    process_and_save_data(trainloader, f'data_split/masked_CIFAR224_train_{class_number}.pkl', f"masked_CIFAR224_train_{class_number}")
+    process_and_save_data(valloader, f'data_split/masked_CIFAR224_val_{class_number}.pkl', f"masked_CIFAR224_val_{class_number}")
+    process_and_save_data(testloader, f'data_split/masked_CIFAR224_test_{class_number}.pkl', f"masked_CIFAR224_test_{class_number}")
+    print("All masked datasets generated and saved successfully!")
+
 def display_gen_dataset(trainset_path, valset_path, num_images=4):
 
     # Helper function to unnormalize and display an image
@@ -472,28 +653,6 @@ def display_gen_dataset(trainset_path, valset_path, num_images=4):
     plt.tight_layout()
     plt.show()
 
-def crop_img(imgs):
-
-    if crop_size != 0 and replace_size == 0 : # crop
-        cropped_imgs = imgs[:, :, crop_size:-crop_size, crop_size:-crop_size]  # [B, C, 184, 184]
-        final_imgs = torch.nn.functional.interpolate(cropped_imgs, size=(224, 224), mode="bilinear", align_corners=False)
-    elif crop_size == 0 and replace_size != 0 : # replace
-        processed_imgs = imgs.clone()
-        processed_imgs[:, :, :replace_size, :] = 1  # Replace top edge
-        processed_imgs[:, :, -replace_size:, :] = 1 # Replace bottom edge
-        processed_imgs[:, :, :, :replace_size] = 1  # Replace left edge
-        processed_imgs[:, :, :, -replace_size:] = 1  # Replace right edge
-        final_imgs = processed_imgs
-    # elif crop_size == 0 and replace_size == 0 and only_edge != 0:
-    #     processed_imgs = imgs.clone()
-    #     processed_imgs[:, :, only_edge:-only_edge, only_edge:-only_edge] = 0
-    #     final_imgs =  processed_imgs
-
-    else:
-        final_imgs = imgs
-        
-    return final_imgs
-
 def test_gen_dataset(testset_path, valset_path):
     generator.eval()
     classifier.eval()
@@ -510,10 +669,12 @@ def test_gen_dataset(testset_path, valset_path):
     print("Loading datasets...")
     test_dataset = load_data(testset_path)
     val_dataset = load_data(valset_path)
+    # print(len(test_dataset))
+    # print(len(val_dataset))
 
     # Create DataLoaders
-    test_loader = DataLoader(test_dataset, batch_size=256, shuffle=True, num_workers=2)
-    val_loader = DataLoader(val_dataset, batch_size=256, shuffle=False, num_workers=2)
+    test_loader = DataLoader(test_dataset, batch_size=100, shuffle=True, num_workers=2)
+    val_loader = DataLoader(val_dataset, batch_size=100, shuffle=False, num_workers=2)
 
     trainset_labels, trainset_exits = [], []
     valset_labels, valset_exits = [], []
@@ -526,8 +687,7 @@ def test_gen_dataset(testset_path, valset_path):
             cropped_imgs = crop_img(imgs)
 
             # Evaluate the model on the train and validation datasets
-            trainset_label, trainset_exit = Resnet50_ee.threshold_inference_new(classifier, 0, cropped_imgs,
-                                                                                        [0.7, 0.8, 1.0, 0.8, 0.7])
+            trainset_label, trainset_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, cropped_imgs, thresholds)
             trainset_labels.append(trainset_label)
             trainset_exits.append(trainset_exit)
 
@@ -535,16 +695,14 @@ def test_gen_dataset(testset_path, valset_path):
             imgs, _ = data[0].to(device), data[1].to(device)
             cropped_imgs = crop_img(imgs)
 
-            valset_label, valset_exit = Resnet50_ee.threshold_inference_new(classifier, 0, cropped_imgs,
-                                                                                [0.7, 0.8, 1.0, 0.8, 0.7])
+            valset_label, valset_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, cropped_imgs, thresholds)
             valset_labels.append(valset_label)
             valset_exits.append(valset_exit)
 
         for idx, data in enumerate(testloader):
             imgs, _ = data[0].to(device), data[1].to(device)
             cropped_imgs = crop_img(imgs)
-            ori_trainset_label, ori_trainset_exit = Resnet50_ee.threshold_inference_new(classifier, 0, imgs,
-                                                                                [0.7, 0.8, 1.0, 0.8, 0.7])
+            ori_trainset_label, ori_trainset_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, imgs, thresholds)
 
             ori_trainset_labels.append(ori_trainset_label)
             ori_trainset_exits.append(ori_trainset_exit)
@@ -552,8 +710,7 @@ def test_gen_dataset(testset_path, valset_path):
         for idx, data in enumerate(valloader):
             imgs, _ = data[0].to(device), data[1].to(device)
             cropped_imgs = crop_img(imgs)
-            ori_valset_label, ori_valset_exit = Resnet50_ee.threshold_inference_new(classifier, 0, imgs,
-                                                                            [0.7, 0.8, 1.0, 0.8, 0.7])
+            ori_valset_label, ori_valset_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, imgs, thresholds)
 
             ori_valset_labels.append(ori_valset_label)
             ori_valset_exits.append(ori_valset_exit)
@@ -567,17 +724,15 @@ def test_gen_dataset(testset_path, valset_path):
     print(f"-----Val Exit Location: {valset_exits}")
     print(f'Original Exit Location: {ori_valset_exits}\n')
 
-    diff = [
-        [b_item - a_item for a_item, b_item in zip(a, b)]
-        for a, b in zip(trainset_exits, ori_trainset_exits)
-    ]
-    negative_count = sum(
-        1 for sublist in diff for value in sublist if value < 0
-    )
-    positive_count = sum(
-        1 for sublist in diff for value in sublist if value > 0
-    )
-    total_diff = sum(len(sublist) for sublist in diff)
+    # Flatten the nested lists before calculating differences
+    flat_train_exits = [item for sublist in trainset_exits for item in sublist]
+    flat_ori_exits = [item for sublist in ori_trainset_exits for item in sublist]
+
+    # Calculate differences
+    diff = [b - a for a, b in zip(flat_train_exits, flat_ori_exits)]
+    negative_count = sum(1 for value in diff if value < 0)
+    positive_count = sum(1 for value in diff if value > 0)
+    total_diff = len(diff)
 
     print(f"early or late: {diff}")
     print(f"negative count: {negative_count} of {total_diff}")
@@ -596,12 +751,19 @@ def initialize_model(classifier_name):
         classifier.to(device)
         classifier.eval()
 
+        thresholds = [0.7, 0.8, 1.0, 0.8, 0.7]
+
     elif classifier_name == 'B_Vgg16':
         classifier = BranchVGG16BN()
         classifier.to(device)
         classifier = nn.DataParallel(classifier, device_ids=[0, 1, 2, 3])
         classifier.load_state_dict(torch.load(r"weights/Vgg16bn_ee_224/Vgg16bn_epoch_15.pth", weights_only=True))
         classifier.eval()
+
+        thresholds = [0.5, 0.5, 0.7, 0.85, 0.5]
+        # thresholds = [0, 0.5, 0.7, 0.85, 0.5]
+        # thresholds = [0, 0, 0.7, 0.85, 0.5]
+        # thresholds = [0, 0, 0, 0.85, 0.5]
 
     elif classifier_name == 'B_Resnet50':
         classifier = BranchedResNet50()
@@ -610,19 +772,68 @@ def initialize_model(classifier_name):
         classifier.load_state_dict(torch.load(r"weights/Resnet50/B-Resnet50_epoch_10.pth", weights_only=True))
         classifier.eval()
 
+        thresholds = [0, 0, 0, 0.05]
+        # thresholds = [0.3, 0.45, 0.7, 0.05]
+
+
     # get airplane/etc class index
     root = '/home/yibo/PycharmProjects/Thesis/CIFAR10'
     dataprep = Data_prep_224_gen(root)
-    train_idx, val_idx, test_idx = dataprep.get_category_index(category=category)  # 0 airplane, 3 cat, 8 ship
-    # print(f"Total entries in train_idx: {len(train_idx)}, val_idx: {len(val_idx)}, test_idx: {len(test_idx)}")
-    trainloader, valloader, testloader = dataprep.create_catogery_loaders(batch_size=128, num_workers=2,
+
+
+    if ALL_CLASS:
+        if MASK:
+            None
+            # todo, add all_class code here
+        else:
+            trainloader, valloader, testloader = dataprep.create_loaders(batch_size=128, num_workers=2)
+    else:
+        if MASK:
+            if CREATE: create_masked_dataset(category)
+            masked_train_dataset = MaskedDataset(f'data_split/masked_CIFAR224_train_{category}.pkl')
+            masked_val_dataset = MaskedDataset(f'data_split/masked_CIFAR224_val_{category}.pkl')
+            masked_test_dataset = MaskedDataset(f'data_split/masked_CIFAR224_test_{category}.pkl')
+
+            trainloader = DataLoader(masked_train_dataset, batch_size=128, shuffle=True, num_workers=2)
+            valloader = DataLoader(masked_val_dataset, batch_size=128, shuffle=False, num_workers=2)
+            testloader = DataLoader(masked_test_dataset, batch_size=128, shuffle=False, num_workers=2)
+        else:
+            train_idx, val_idx, test_idx = dataprep.get_category_index(category=category)  # 0 airplane, 3 cat, 8 ship
+            # print(f"Total entries in train_idx: {len(train_idx)}, val_idx: {len(val_idx)}, test_idx: {len(test_idx)}")
+            trainloader, valloader, testloader = dataprep.create_catogery_loaders(batch_size=64, num_workers=2,
                                                                           train_idx=train_idx, val_idx=val_idx,
                                                                           test_idx=test_idx)
+        # if MASK:
+        #
+        #     # masked_train_dataset = load_data(f"data_split/masked_CIFAR224_train.pkl")
+        #     # masked_val_dataset = load_data(f"data_split/masked_CIFAR224_val.pkl")
+        #     # masked_test_dataset = load_data(f"data_split/masked_CIFAR224_test.pkl")
+        #     # print(len(masked_train_dataset), len(masked_val_dataset), len(masked_test_dataset))
+        #     #
+        #     # trainloader = DataLoader(masked_train_dataset, batch_size=128, shuffle=True, num_workers=2)
+        #     # valloader = DataLoader(masked_val_dataset, batch_size=128, shuffle=False, num_workers=2)
+        #     # testloader = DataLoader(masked_test_dataset, batch_size=128, shuffle=False, num_workers=2)
+        #     #
+        #     # print(len(trainloader.dataset), len(valloader.dataset), len(testloader))
+        #
+        # else:
+        #     train_idx, val_idx, test_idx = dataprep.get_category_index(category=category)  # 0 airplane, 3 cat, 8 ship
+        #     # print(f"Total entries in train_idx: {len(train_idx)}, val_idx: {len(val_idx)}, test_idx: {len(test_idx)}")
+        #     trainloader, valloader, testloader = dataprep.create_catogery_loaders(batch_size=128, num_workers=2,
+        #                                                                   train_idx=train_idx, val_idx=val_idx,
+        #                                                                   test_idx=test_idx)
 
     generator = Generator().to(device)
     generator = nn.DataParallel(generator, device_ids=[0, 1, 2, 3])
 
-    return generator, classifier, device, trainloader, valloader, testloader
+    # # Load ori ResNet50 for gradcam mask
+    resnet_for_cam = ResNet_50().to(device)
+    resnet_for_cam = nn.DataParallel(resnet_for_cam, device_ids=[0, 1, 2, 3])
+    resnet_for_cam.load_state_dict(torch.load(r"weights/Resnet50/Resnet50_ori_epoch_20.pth", weights_only=True))
+    resnet_for_cam.eval()
+
+    return generator, classifier, resnet_for_cam, thresholds, device, trainloader, valloader, testloader
+
 
 if __name__ == "__main__":
 
@@ -634,22 +845,29 @@ if __name__ == "__main__":
     crop_size = 0
     replace_size = 0
     only_edge = 0
-    WHITE_BOARD_TEST = False
-    TRAIN = False
-    classifier_name = "B_Resnet50"
-    category = 3 # 0 Airplane, 1 Automobile, 2 Bird, 3 Cat, 4 Deer, 5 Dog, 6 Frog, 7 Horse, 8 Ship, 9 Truck
 
-    generator, classifier, device, trainloader, valloader, testloader = initialize_model(classifier_name)
+    WHITE_BOARD_TEST = False
+    ALL_CLASS = False
+    CREATE = False
+    MASK = False
+    TRAIN = True
+    disable_EE = [1.0, 0, 0, 0, 0] # 5 exits, 0 means disable, 1 means enable
+
+    classifier_name = "B_Vgg16"
+    category = 6 # 0 Airplane, 1 Automobile, 2 Bird, 3 Cat, 4 Deer, 5 Dog, 6 Frog, 7 Horse, 8 Ship, 9 Truck
+
+    generator, classifier, resnet_for_cam, thresholds, device, trainloader, valloader, testloader = initialize_model(classifier_name)
     optimizer = optim.Adam(generator.parameters(), lr=1e-3)
+    thresholds = np.multiply(disable_EE, thresholds)
 
     if TRAIN:
-        train(200)
+        # generator.load_state_dict(torch.load('training_weights/Generator224/Generator_epoch_100.pth', weights_only=True))
+        train(50)
     else:
         # generator.load_state_dict(torch.load('weights/Generator224/vgg/Generator_epoch_50_ship.pth', weights_only=True))
-        generator.load_state_dict(torch.load('training_weights/Generator224/Generator_epoch_60.pth', weights_only=True))
+        generator.load_state_dict(torch.load('training_weights/Generator224/Generator_epoch_30.pth', weights_only=True))
 
     test(5, 2)  # test n imgs per batch of testloader; in total 4n~5n imgs
     gen_dataset(generator, trainloader, valloader, testloader)
-    # display_gen_dataset('data_split/generated_CIFAR224_test.pkl', 'data_split/generated_CIFAR224_val.pkl', 10)
+    # display_gen_dataset('data_split/masked_CIFAR224_test.pkl', 'data_split/masked_CIFAR224_val.pkl', 10)
     test_gen_dataset('data_split/generated_CIFAR224_test.pkl', 'data_split/generated_CIFAR224_val.pkl')
-

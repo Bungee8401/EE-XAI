@@ -4,7 +4,7 @@ import torch
 import torchvision
 from torchvision import datasets
 import torchvision.transforms as transforms
-from torch.utils.data import DataLoader, Subset, random_split
+from torch.utils.data import DataLoader, Subset, random_split, Dataset
 
 trans_train = transforms.Compose([
     transforms.Resize((224, 224)),  # Resize to 224x224
@@ -229,7 +229,7 @@ class Data_prep_224_01_N:
         val_sampler = torch.utils.data.SubsetRandomSampler(val_idx)
         test_sampler = torch.utils.data.SubsetRandomSampler(test_idx)
 
-        trainloader = DataLoader(self.trainset, batch_size=batch_size, shuffle=True, num_workers=num_workers, sampler=train_sampler)
+        trainloader = DataLoader(self.trainset, batch_size=batch_size, shuffle=False, num_workers=num_workers, sampler=train_sampler)
         valloader = DataLoader(self.valset, batch_size=batch_size, shuffle=False, num_workers=num_workers, sampler=val_sampler)
         testloader = DataLoader(self.testset, batch_size=batch_size, shuffle=False, num_workers=num_workers, sampler=test_sampler)
 
@@ -281,6 +281,24 @@ class Data_prep_224_gen:
         testloader = DataLoader(self.testset, batch_size=batch_size, shuffle=False, num_workers=num_workers, sampler=test_sampler)
 
         return trainloader, valloader, testloader
+
+class MaskedDataset(Dataset):
+    def __init__(self, pkl_path):
+        with open(pkl_path, 'rb') as f:
+            data = pickle.load(f)
+
+        # Ensure the expected keys exist
+        if "images" not in data or "labels" not in data:
+            raise KeyError(f"Required keys 'images' and 'labels' not found in {pkl_path}")
+
+        self.images = data['images']
+        self.labels = data['labels']
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx):
+        return self.images[idx], self.labels[idx]
 
 if __name__ == '__main__':
     # root = 'D:/Study/Module/Master Thesis/dataset/CIFAR10'
