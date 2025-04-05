@@ -400,6 +400,16 @@ possible could-try things:
 
     3. look for pics that match the learnt class pattern, test the EE condition
 
+------------------25.03 2025---------------------
+todo:   1. train more epochs only with 1st ext, see if white board test can be more close to a frog -> not clearly
+        2. at least first get the fixed pattern for 10 classes
+            - 500 EE_loss done      -> too much noise in almost every class
+            - 200 EE_loss ing...    -> better in cat
 
 
 
+
+-------------------02.04 2025---------------------
+
+todo:   1. resnet50 10 class pattern
+        2. gard-cam dataset, retrain classifiers

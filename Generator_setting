@@ -63,3 +63,191 @@
                     train 100 epochs
                     b) 500 * exit_loss  -> all E0
 
+
+
+
+
+
+
+
+--------------------- thesis conclusion --------------------------------
+
+
+
+
+----------------------vgg16---------------------
+
+# 0 airplane    bs = 100, exit_l = 500, 50 epoch, 1e-3
+
+
+# 3 cat
+
+        bs = 100, exit_l = 200, 50 epoch, 1e-3
+
+        Number of 3s in Original Labels: 808
+        Number of 3s in Generated Labels: 1000
+
+        negative count: 0 of 1000
+        positive count: 979 of 1000
+        maintain count: 21 of 1000
+
+# 5 dog
+
+        bs = 100, exit_l = 300, 50 epoch, 1e-3
+
+        Number of 5s in Original Labels: 734
+        Number of 5s in Generated Labels: 1000
+
+        negative count: 3 of 1000
+        positive count: 909 of 1000
+        maintain count: 88 of 1000
+
+
+# 8 ship
+
+    bs = 100, exit_l = 400, 50 epoch, 1e-3
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+----------------- resnet50 ----------------- (when disable early EE, generated imgs appear to have less noises)
+# 0 airplane
+
+    bs = 100, exit_l = 300, 50 epoch, 1e-3
+
+        Number of 0s in Original Labels: 850
+        Number of 0s in Generated Labels: 1000
+
+        negative count: 2 of 1000
+        positive count: 785 of 1000
+        maintain count: 213 of 1000
+
+
+# 1 automobile
+
+    bs = 100, exit_l = 300, 50 epoch, 1e-3
+
+        Number of 1s in Original Labels: 914
+        Number of 1s in Generated Labels: 999
+
+        negative count: 11 of 1000
+        positive count: 561 of 1000
+        maintain count: 428 of 1000
+
+    bs = 100, exit_l = 500, 50 epoch, 1e-3
+
+        Number of 1s in Original Labels: 914
+        Number of 1s in Generated Labels: 999
+
+        negative count: 2 of 1000
+        positive count: 569 of 1000
+        maintain count: 429 of 1000
+
+# 2 bird
+
+    bs = 100, exit_l = 500, 50 epoch, 1e-3      not a good class may due to ostrich
+
+        Number of 2s in Original Labels: 762
+        Number of 2s in Generated Labels: 1000
+
+        negative count: 3 of 1000
+        positive count: 867 of 1000
+        maintain count: 130 of 1000
+
+#3 cat
+
+    bs = 100, exit_l = 300 / 500, 50 epoch, 1e-3    no
+
+
+
+# 4 deer
+
+    bs = 100, exit_l = 300, 50 epoch, 1e-3    no
+
+        Number of 4s in Original Labels: 832
+        Number of 4s in Generated Labels: 1000
+
+        negative count: 2 of 1000
+        positive count: 978 of 1000
+        maintain count: 20 of 1000
+
+
+# 5 dog
+
+    bs = 100, exit_l = 300, 50 epoch, 1e-3
+
+        Number of 5s in Original Labels: 891
+        Number of 5s in Generated Labels: 1000
+
+        negative count: 2 of 1000
+        positive count: 895 of 1000
+        maintain count: 103 of 1000
+
+# 6 frog
+
+    bs = 100, exit_l = 300, 50 epoch, 1e-3
+
+        Number of 6s in Original Labels: 867
+        Number of 6s in Generated Labels: 999
+
+        negative count: 4 of 1000
+        positive count: 739 of 1000
+        maintain count: 257 of 1000
+
+# 7 horse
+
+    bs = 100, exit_l = 300, 50 epoch, 1e-3
+
+        Number of 7s in Original Labels: 909
+        Number of 7s in Generated Labels: 1000
+
+        negative count: 3 of 1000
+        positive count: 733 of 1000
+        maintain count: 264 of 1000
+
+# 8 ship
+
+    bs = 100, exit_l = 500, 50 epoch, 1e-3
+
+
+        Number of 8s in Original Labels: 902
+        Number of 8s in Generated Labels: 1000
+
+        negative count: 1 of 1000
+        positive count: 743 of 1000
+        maintain count: 256 of 1000
+
+# 9 truck
+
+    bs = 100, exit_l = 500, 50 epoch, 1e-3
+
+        Number of 9s in Original Labels: 917
+        Number of 9s in Generated Labels: 1000
+
+        negative count: 2 of 1000
+        positive count: 443 of 1000
+        maintain count: 555 of 1000
+
+
+
+
+
+
+
+
+
+
+

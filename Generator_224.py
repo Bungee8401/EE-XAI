@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import numpy as np
 import os
 import torch.optim as optim
+import torchvision
 import torchvision.models as models
 from sympy import false
 from torchvision.models.quantization import resnet50
@@ -12,6 +13,7 @@ import Alex_ee_inference
 import Vgg16_ee_inference
 import Resnet50_ee
 from Alexnet_early_exit import BranchedAlexNet
+from GAN import save_images
 from Vgg16bn_early_exit_small_fc import BranchVGG16BN
 from Resnet50_ee import BranchedResNet50
 import matplotlib.pyplot as plt
@@ -294,6 +296,7 @@ def compute_loss(model, generated, original_img, target_label):
     if classifier_name == 'B_alex' or classifier_name == 'B_Vgg16':
         main_out, exit1_out, exit2_out, exit3_out, exit4_out, exit5_out = classifier(generated)
         exit_confidences = compute_entropy_5(exit1_out, exit2_out, exit3_out, exit4_out, exit5_out)
+
     elif classifier_name == 'B_Resnet50':
         main_out, exit1_out, exit2_out, exit3_out, exit4_out = classifier(generated)
         exit_confidences = compute_entropy_4(exit1_out, exit2_out, exit3_out, exit4_out)
@@ -320,7 +323,7 @@ def compute_loss(model, generated, original_img, target_label):
     sim_loss = nn.L1Loss()(generated, original_img)
     # sim_loss = centered_l1_loss(generated, original_img, center_weight=5.0)
 
-    return 500 * exit_loss  +  500 * cls_loss2 +  500 * cls_loss1 + 500 * sim_loss
+    return EE_LOSS_PARA * exit_loss  +  500 * cls_loss2 +  500 * cls_loss1 + 500 * sim_loss
 
 def compute_entropy_5(exit1_out, exit2_out, exit3_out, exit4_out, exit5_out):
     softmax_exit1 = F.softmax(exit1_out, dim=1)
@@ -355,7 +358,7 @@ def compute_entropy_4(exit1_out, exit2_out, exit3_out, exit4_out):
 
     return torch.stack([entropy_exit1, entropy_exit2, entropy_exit3, entropy_exit4], dim=0)
 
-def grad_cam_mask(label, images):
+def grad_cam_mask(label, images, resnet_for_cam):
 
     # 1. captum
     # layer_gradcam = LayerGradCam(resnet_for_cam, resnet_for_cam.module.layer4[2].conv3) # Resnet50
@@ -365,7 +368,7 @@ def grad_cam_mask(label, images):
 
     # 2. pytorch_grad_cam
     cam = GradCAM(model=resnet_for_cam, target_layers=[resnet_for_cam.module.layer4[-1]])
-    masked_images = torch.zeros_like(images)
+    masked_images = torch.zeros_like(images).to(torch.uint8)
     for idx in range(images.shape[0]):
         input_tensor = images[idx].unsqueeze(0)  # Add batch dimension back
         target = ClassifierOutputTarget(label[idx].item())
@@ -380,6 +383,9 @@ def grad_cam_mask(label, images):
 
         # Normalize the masked image
         masked_img = (masked_img - masked_img.min()) / (masked_img.max() - masked_img.min())
+
+        # Convert normalized float values [0,1] to integers [0,255]
+        masked_img = (masked_img * 255).to(torch.uint8)
 
         # Store in output tensor
         masked_images[idx] = masked_img
@@ -439,9 +445,11 @@ def train(num_epoch):
         if not os.path.exists(r"/home/yibo/PycharmProjects/Thesis/training_weights/Generator224"):
                 os.makedirs(r"/home/yibo/PycharmProjects/Thesis/training_weights/Generator224")
         if (epoch+1) % 10 == 0:
-            torch.save(generator.state_dict(),
-                    f"/home/yibo/PycharmProjects/Thesis/training_weights/Generator224/Generator_epoch_{epoch+1}.pth")
-            test(5,2)
+            torch.save({
+                'model_state_dict': generator.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+            }, f'training_weights/Generator224/Generator_epoch_{epoch+1}.pth')
+            test(10,1)
 
 def test(batch, num):
     generator.eval()
@@ -460,7 +468,6 @@ def test(batch, num):
 
             if WHITE_BOARD_TEST:
                 original_images.fill_(0)
-
             # print(original_images.max(), original_images.min(), original_images.mean())
 
             classified_label, original_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, original_images,
@@ -469,6 +476,10 @@ def test(batch, num):
             generated_images = generator(original_images)
             # print(generated_images.max(), generated_images.min(), generated_images.mean())
             generated_images_crop = crop_img(generated_images)
+
+            if WHITE_BOARD_TEST:
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                torchvision.utils.save_image(generated_images_crop[0], f'Results/white_board/white_board_{timestamp}.png', normalize=True)
 
             #1 use diff to combine
 
@@ -511,11 +522,15 @@ def test(batch, num):
 
                 plt.imshow(out1_normalized)
                 plt.subplot(1, 2, 2)
-                plt.title(f"crop size {crop_size}, replace size {replace_size}, only edge {only_edge}\n "
-                          f"Gen Image {i + 1}, "
+                plt.title(f"Gen Image {i + 1}, "
                           f"label: {classified_label_gen[i]}, "
                           f"exit: {generated_exit[i]}"
-                )
+                          )
+                # plt.title(f"crop size {crop_size}, replace size {replace_size}, only edge {only_edge}\n "
+                #           f"Gen Image {i + 1}, "
+                #           f"label: {classified_label_gen[i]}, "
+                #           f"exit: {generated_exit[i]}"
+                # )
 
                 out2 = np.transpose(generated_images_crop[i].cpu().numpy(), (1, 2, 0))
                 out2_normalized = (out2 - np.min(out2)) / (np.max(out2) - np.min(out2))
@@ -562,7 +577,7 @@ def gen_dataset(generator, trainloader, valloader, testloader):
 
     process_and_save_data(testloader, 'data_split/generated_CIFAR224_test.pkl', "generated_CIFAR224_test")
 
-def create_masked_dataset(class_number):
+def create_masked_dataset(class_number, resnet_for_cam):
     def process_and_save_data(dataloader, save_path, dataset_name):
         generated_images = []
         labels = []
@@ -573,7 +588,7 @@ def create_masked_dataset(class_number):
             images = images.to(device)
             batch_labels = batch_labels.to(device)
 
-            masked_imgs = grad_cam_mask(batch_labels, images)
+            masked_imgs = grad_cam_mask(batch_labels, images, resnet_for_cam)
             # Move data to CPU for saving
             generated_images.append(masked_imgs.cpu())
             labels.append(batch_labels.detach().cpu())
@@ -740,8 +755,8 @@ def test_gen_dataset(testset_path, valset_path):
     print(f"maintain count: {total_diff - positive_count - negative_count} of {total_diff}")
 
 def initialize_model(classifier_name):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if classifier_name == 'B_alex':
         classifier = BranchedAlexNet()
@@ -756,7 +771,7 @@ def initialize_model(classifier_name):
     elif classifier_name == 'B_Vgg16':
         classifier = BranchVGG16BN()
         classifier.to(device)
-        classifier = nn.DataParallel(classifier, device_ids=[0, 1, 2, 3])
+        classifier = nn.DataParallel(classifier, device_ids=[0, 1 ,2, 3])
         classifier.load_state_dict(torch.load(r"weights/Vgg16bn_ee_224/Vgg16bn_epoch_15.pth", weights_only=True))
         classifier.eval()
 
@@ -768,69 +783,32 @@ def initialize_model(classifier_name):
     elif classifier_name == 'B_Resnet50':
         classifier = BranchedResNet50()
         classifier.to(device)
-        classifier = nn.DataParallel(classifier, device_ids=[0, 1, 2, 3])
+        classifier = nn.DataParallel(classifier, device_ids=[0, 1 ,2, 3])
         classifier.load_state_dict(torch.load(r"weights/Resnet50/B-Resnet50_epoch_10.pth", weights_only=True))
         classifier.eval()
 
-        thresholds = [0, 0, 0, 0.05]
-        # thresholds = [0.3, 0.45, 0.7, 0.05]
+        thresholds = [0.3, 0.45, 0.7, 0.05]
+
+
+    generator = Generator().to(device)
+    generator = nn.DataParallel(generator, device_ids=[0, 1 ,2, 3])
+
+    # # Load ori ResNet50 for gradcam mask
+    resnet_for_cam = ResNet_50().to(device)
+    resnet_for_cam = nn.DataParallel(resnet_for_cam, device_ids=[0, 1 ,2, 3])
+    resnet_for_cam.load_state_dict(torch.load(r"weights/Resnet50/Resnet50_ori_epoch_20.pth", weights_only=True))
+    resnet_for_cam.eval()
 
 
     # get airplane/etc class index
     root = '/home/yibo/PycharmProjects/Thesis/CIFAR10'
     dataprep = Data_prep_224_gen(root)
 
-
-    if ALL_CLASS:
-        if MASK:
-            None
-            # todo, add all_class code here
-        else:
-            trainloader, valloader, testloader = dataprep.create_loaders(batch_size=128, num_workers=2)
-    else:
-        if MASK:
-            if CREATE: create_masked_dataset(category)
-            masked_train_dataset = MaskedDataset(f'data_split/masked_CIFAR224_train_{category}.pkl')
-            masked_val_dataset = MaskedDataset(f'data_split/masked_CIFAR224_val_{category}.pkl')
-            masked_test_dataset = MaskedDataset(f'data_split/masked_CIFAR224_test_{category}.pkl')
-
-            trainloader = DataLoader(masked_train_dataset, batch_size=128, shuffle=True, num_workers=2)
-            valloader = DataLoader(masked_val_dataset, batch_size=128, shuffle=False, num_workers=2)
-            testloader = DataLoader(masked_test_dataset, batch_size=128, shuffle=False, num_workers=2)
-        else:
-            train_idx, val_idx, test_idx = dataprep.get_category_index(category=category)  # 0 airplane, 3 cat, 8 ship
-            # print(f"Total entries in train_idx: {len(train_idx)}, val_idx: {len(val_idx)}, test_idx: {len(test_idx)}")
-            trainloader, valloader, testloader = dataprep.create_catogery_loaders(batch_size=64, num_workers=2,
-                                                                          train_idx=train_idx, val_idx=val_idx,
-                                                                          test_idx=test_idx)
-        # if MASK:
-        #
-        #     # masked_train_dataset = load_data(f"data_split/masked_CIFAR224_train.pkl")
-        #     # masked_val_dataset = load_data(f"data_split/masked_CIFAR224_val.pkl")
-        #     # masked_test_dataset = load_data(f"data_split/masked_CIFAR224_test.pkl")
-        #     # print(len(masked_train_dataset), len(masked_val_dataset), len(masked_test_dataset))
-        #     #
-        #     # trainloader = DataLoader(masked_train_dataset, batch_size=128, shuffle=True, num_workers=2)
-        #     # valloader = DataLoader(masked_val_dataset, batch_size=128, shuffle=False, num_workers=2)
-        #     # testloader = DataLoader(masked_test_dataset, batch_size=128, shuffle=False, num_workers=2)
-        #     #
-        #     # print(len(trainloader.dataset), len(valloader.dataset), len(testloader))
-        #
-        # else:
-        #     train_idx, val_idx, test_idx = dataprep.get_category_index(category=category)  # 0 airplane, 3 cat, 8 ship
-        #     # print(f"Total entries in train_idx: {len(train_idx)}, val_idx: {len(val_idx)}, test_idx: {len(test_idx)}")
-        #     trainloader, valloader, testloader = dataprep.create_catogery_loaders(batch_size=128, num_workers=2,
-        #                                                                   train_idx=train_idx, val_idx=val_idx,
-        #                                                                   test_idx=test_idx)
-
-    generator = Generator().to(device)
-    generator = nn.DataParallel(generator, device_ids=[0, 1, 2, 3])
-
-    # # Load ori ResNet50 for gradcam mask
-    resnet_for_cam = ResNet_50().to(device)
-    resnet_for_cam = nn.DataParallel(resnet_for_cam, device_ids=[0, 1, 2, 3])
-    resnet_for_cam.load_state_dict(torch.load(r"weights/Resnet50/Resnet50_ori_epoch_20.pth", weights_only=True))
-    resnet_for_cam.eval()
+    train_idx, val_idx, test_idx = dataprep.get_category_index(category=category)  # 0 airplane, 3 cat, 8 ship
+    # print(f"Total entries in train_idx: {len(train_idx)}, val_idx: {len(val_idx)}, test_idx: {len(test_idx)}")
+    trainloader, valloader, testloader = dataprep.create_catogery_loaders(batch_size=100, num_workers=2,
+                                                                  train_idx=train_idx, val_idx=val_idx,
+                                                                  test_idx=test_idx)
 
     return generator, classifier, resnet_for_cam, thresholds, device, trainloader, valloader, testloader
 
@@ -840,34 +818,43 @@ if __name__ == "__main__":
     # B_alex Alex_ee_inference
     # B_Vgg16 Vgg16_ee_inference
     # B_Resnet50 Resnet50_ee
-    pl.seed_everything(2024)
 
     crop_size = 0
     replace_size = 0
     only_edge = 0
 
-    WHITE_BOARD_TEST = False
-    ALL_CLASS = False
-    CREATE = False
-    MASK = False
-    TRAIN = True
-    disable_EE = [1.0, 0, 0, 0, 0] # 5 exits, 0 means disable, 1 means enable
+    pl.seed_everything(2024)
+
+    # 1 for training, 0 for white board
+    if 1 :
+        WHITE_BOARD_TEST = False   # actually its black board test
+        TRAIN = True
+    else:
+        WHITE_BOARD_TEST = True   # actually its black board test
+        TRAIN = False
 
     classifier_name = "B_Vgg16"
-    category = 6 # 0 Airplane, 1 Automobile, 2 Bird, 3 Cat, 4 Deer, 5 Dog, 6 Frog, 7 Horse, 8 Ship, 9 Truck
+    category = 8 # 0 Airplane, 1 Automobile, 2 Bird, 3 Cat, 4 Deer, 5 Dog, 6 Frog, 7 Horse, 8 Ship, 9 Truck
+    EE_LOSS_PARA = 400
 
     generator, classifier, resnet_for_cam, thresholds, device, trainloader, valloader, testloader = initialize_model(classifier_name)
-    optimizer = optim.Adam(generator.parameters(), lr=1e-3)
-    thresholds = np.multiply(disable_EE, thresholds)
+    optimizer = optim.Adam(generator.parameters(), lr=1e-3) # 1e-4 is not good
+    # thresholds = np.multiply(disable_EE, thresholds)
 
     if TRAIN:
-        # generator.load_state_dict(torch.load('training_weights/Generator224/Generator_epoch_100.pth', weights_only=True))
+        # checkpoint = torch.load('training_weights/Generator224/Generator_epoch_40.pth')
+        # generator.load_state_dict(checkpoint['model_state_dict'])
+        # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         train(50)
     else:
-        # generator.load_state_dict(torch.load('weights/Generator224/vgg/Generator_epoch_50_ship.pth', weights_only=True))
-        generator.load_state_dict(torch.load('training_weights/Generator224/Generator_epoch_30.pth', weights_only=True))
+        checkpoint = torch.load('training_weights/Generator224/Generator_epoch_50.pth')
+        generator.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-    test(5, 2)  # test n imgs per batch of testloader; in total 4n~5n imgs
-    gen_dataset(generator, trainloader, valloader, testloader)
-    # display_gen_dataset('data_split/masked_CIFAR224_test.pkl', 'data_split/masked_CIFAR224_val.pkl', 10)
-    test_gen_dataset('data_split/generated_CIFAR224_test.pkl', 'data_split/generated_CIFAR224_val.pkl')
+    if WHITE_BOARD_TEST:
+        test(1,1)
+    else:
+        test(10, 1)  # test #batch, each batch show #num images; todo: also affect number of ?s in labels!!!
+        gen_dataset(generator, trainloader, valloader, testloader)
+        # display_gen_dataset('data_split/masked_CIFAR224_test.pkl', 'data_split/masked_CIFAR224_val.pkl', 10)
+        test_gen_dataset('data_split/generated_CIFAR224_test.pkl', 'data_split/generated_CIFAR224_val.pkl')
