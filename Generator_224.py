@@ -306,12 +306,17 @@ def compute_loss(model, generated, original_img, target_label):
     # 分类损失（最终层输出）
 
     # 1. labels as measurement
-    # classified_label, exit_point = Alex_ee_inference.threshold_inference_new(model, 0, generated_224, [0.5, 0.6, 0.3, 0.2, 0.2])
+    # classified_label, exit_point = Resnet50_ee.threshold_inference_new(model, 0, generated_224, [0.5, 0.6, 0.3, 0.2, 0.2])
     # cls_loss = nn.MSELoss()(classified_label.float(), target_label.float())
 
     # 2. use features as measurement
-    gen_feature = classifier.module.extract_features(generated)
-    ori_feature = classifier.module.extract_features(original_img)
+    if classifier_name == 'B_alex':
+        gen_feature = classifier.extract_features(generated)
+        ori_feature = classifier.extract_features(original_img)
+    if classifier_name == 'B_Vgg16' or classifier_name == 'B_Resnet50':
+        gen_feature = classifier.module.extract_features(generated)
+        ori_feature = classifier.module.extract_features(original_img)
+
     cls_loss1 = nn.MSELoss()(gen_feature, ori_feature)
 
     # cls_loss1 = nn.CrossEntropyLoss()(gen_feature, ori_feature) # label and exit point is great, but img is nothing
@@ -470,7 +475,7 @@ def test(batch, num):
                 original_images.fill_(0)
             # print(original_images.max(), original_images.min(), original_images.mean())
 
-            classified_label, original_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, original_images,
+            classified_label, original_exit = Resnet50_ee.threshold_inference_new(classifier, 0, original_images,
                                                                                     thresholds)
 
             generated_images = generator(original_images)
@@ -499,7 +504,7 @@ def test(batch, num):
             # original_images_copy[:,:, only_edge: -only_edge, only_edge: -only_edge] = 2*generated_images_crop[:,:, only_edge: -only_edge, only_edge: -only_edge]
             # generated_images_crop = original_images_copy
 
-            classified_label_gen, generated_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, generated_images_crop,
+            classified_label_gen, generated_exit = Resnet50_ee.threshold_inference_new(classifier, 0, generated_images_crop,
                                                                                       thresholds)
 
             print(f"Original Image - label: {classified_label}, \n Exit Location: {original_exit}")
@@ -702,7 +707,7 @@ def test_gen_dataset(testset_path, valset_path):
             cropped_imgs = crop_img(imgs)
 
             # Evaluate the model on the train and validation datasets
-            trainset_label, trainset_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, cropped_imgs, thresholds)
+            trainset_label, trainset_exit = Resnet50_ee.threshold_inference_new(classifier, 0, cropped_imgs, thresholds)
             trainset_labels.append(trainset_label)
             trainset_exits.append(trainset_exit)
 
@@ -710,14 +715,14 @@ def test_gen_dataset(testset_path, valset_path):
             imgs, _ = data[0].to(device), data[1].to(device)
             cropped_imgs = crop_img(imgs)
 
-            valset_label, valset_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, cropped_imgs, thresholds)
+            valset_label, valset_exit = Resnet50_ee.threshold_inference_new(classifier, 0, cropped_imgs, thresholds)
             valset_labels.append(valset_label)
             valset_exits.append(valset_exit)
 
         for idx, data in enumerate(testloader):
             imgs, _ = data[0].to(device), data[1].to(device)
             cropped_imgs = crop_img(imgs)
-            ori_trainset_label, ori_trainset_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, imgs, thresholds)
+            ori_trainset_label, ori_trainset_exit = Resnet50_ee.threshold_inference_new(classifier, 0, imgs, thresholds)
 
             ori_trainset_labels.append(ori_trainset_label)
             ori_trainset_exits.append(ori_trainset_exit)
@@ -725,7 +730,7 @@ def test_gen_dataset(testset_path, valset_path):
         for idx, data in enumerate(valloader):
             imgs, _ = data[0].to(device), data[1].to(device)
             cropped_imgs = crop_img(imgs)
-            ori_valset_label, ori_valset_exit = Vgg16_ee_inference.threshold_inference_new(classifier, 0, imgs, thresholds)
+            ori_valset_label, ori_valset_exit = Resnet50_ee.threshold_inference_new(classifier, 0, imgs, thresholds)
 
             ori_valset_labels.append(ori_valset_label)
             ori_valset_exits.append(ori_valset_exit)
@@ -756,7 +761,7 @@ def test_gen_dataset(testset_path, valset_path):
 
 def initialize_model(classifier_name):
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(cuda_device if torch.cuda.is_available() else "cpu")
 
     if classifier_name == 'B_alex':
         classifier = BranchedAlexNet()
@@ -771,7 +776,7 @@ def initialize_model(classifier_name):
     elif classifier_name == 'B_Vgg16':
         classifier = BranchVGG16BN()
         classifier.to(device)
-        classifier = nn.DataParallel(classifier, device_ids=[0, 1 ,2, 3])
+        classifier = nn.DataParallel(classifier, device_ids=deviceid)
         classifier.load_state_dict(torch.load(r"weights/Vgg16bn_ee_224/Vgg16bn_epoch_15.pth", weights_only=True))
         classifier.eval()
 
@@ -783,7 +788,7 @@ def initialize_model(classifier_name):
     elif classifier_name == 'B_Resnet50':
         classifier = BranchedResNet50()
         classifier.to(device)
-        classifier = nn.DataParallel(classifier, device_ids=[0, 1 ,2, 3])
+        classifier = nn.DataParallel(classifier, device_ids=deviceid)
         classifier.load_state_dict(torch.load(r"weights/Resnet50/B-Resnet50_epoch_10.pth", weights_only=True))
         classifier.eval()
 
@@ -791,11 +796,11 @@ def initialize_model(classifier_name):
 
 
     generator = Generator().to(device)
-    generator = nn.DataParallel(generator, device_ids=[0, 1 ,2, 3])
+    generator = nn.DataParallel(generator, device_ids=deviceid)
 
     # # Load ori ResNet50 for gradcam mask
     resnet_for_cam = ResNet_50().to(device)
-    resnet_for_cam = nn.DataParallel(resnet_for_cam, device_ids=[0, 1 ,2, 3])
+    resnet_for_cam = nn.DataParallel(resnet_for_cam, device_ids=deviceid)
     resnet_for_cam.load_state_dict(torch.load(r"weights/Resnet50/Resnet50_ori_epoch_20.pth", weights_only=True))
     resnet_for_cam.eval()
 
@@ -823,19 +828,23 @@ if __name__ == "__main__":
     replace_size = 0
     only_edge = 0
 
-    pl.seed_everything(2024)
+    # os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
+    deviceid = [0, 1, 2, 3]
+    cuda_device = "cuda:0"
+
+    pl.seed_everything(2020)
 
     # 1 for training, 0 for white board
-    if 1 :
+    if 0 :
         WHITE_BOARD_TEST = False   # actually its black board test
         TRAIN = True
     else:
         WHITE_BOARD_TEST = True   # actually its black board test
         TRAIN = False
 
-    classifier_name = "B_Vgg16"
-    category = 8 # 0 Airplane, 1 Automobile, 2 Bird, 3 Cat, 4 Deer, 5 Dog, 6 Frog, 7 Horse, 8 Ship, 9 Truck
-    EE_LOSS_PARA = 400
+    classifier_name = "B_Resnet50"
+    category = 3 # 0 Airplane, 1 Automobile, 2 Bird, 3 Cat, 4 Deer, 5 Dog, 6 Frog, 7 Horse, 8 Ship, 9 Truck
+    EE_LOSS_PARA = 100
 
     generator, classifier, resnet_for_cam, thresholds, device, trainloader, valloader, testloader = initialize_model(classifier_name)
     optimizer = optim.Adam(generator.parameters(), lr=1e-3) # 1e-4 is not good

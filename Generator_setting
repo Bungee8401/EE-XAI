@@ -102,15 +102,49 @@
         positive count: 909 of 1000
         maintain count: 88 of 1000
 
+# 6 frog
+
+        bs = 100, exit_l = 100, 50 epoch, 1e-3  -> but the pattern cannot be classified correctly
+
+        Number of 6s in Original Labels: 852
+        Number of 6s in Generated Labels: 995
+
+        negative count: 41 of 1000
+        positive count: 799 of 1000
+        maintain count: 160 of 1000
+
+
+        bs = 100, exit_l = 200, 50 epoch, 1e-3
+
+        Number of 6s in Original Labels: 852
+        Number of 6s in Generated Labels: 1000
+
+        negative count: 1 of 1000
+        positive count: 868 of 1000
+        maintain count: 131 of 1000
+
 
 # 8 ship
 
-    bs = 100, exit_l = 400, 50 epoch, 1e-3
+        bs = 100, exit_l = 400, 50 epoch, 1e-3
 
+        Number of 8s in Original Labels: 804
+        Number of 8s in Generated Labels: 1000
 
+        negative count: 1 of 1000
+        positive count: 681 of 1000
+        maintain count: 318 of 1000
 
+# 9 truck
 
+        bs = 100, exit_l = 300, 50 epoch, 1e-3
 
+        Number of 9s in Original Labels: 827
+        Number of 9s in Generated Labels: 1000
+
+        negative count: 0 of 1000
+        positive count: 550 of 1000
+        maintain count: 450 of 1000
 
 
 
@@ -169,13 +203,18 @@
 
 #3 cat
 
-    bs = 100, exit_l = 300 / 500, 50 epoch, 1e-3    no
+    bs = 100, exit_l = 100, 50 epoch, 1e-3    2020
 
+    Number of 3s in Original Labels: 745
+    Number of 3s in Generated Labels: 965
 
+    negative count: 70 of 1000
+    positive count: 601 of 1000
+    maintain count: 329 of 1000
 
 # 4 deer
 
-    bs = 100, exit_l = 300, 50 epoch, 1e-3    no
+    bs = 100, exit_l = 300, 50 epoch, 1e-3
 
         Number of 4s in Original Labels: 832
         Number of 4s in Generated Labels: 1000

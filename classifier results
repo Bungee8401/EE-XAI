@@ -1,0 +1,115 @@
+------------------------------ branch alexnet ------------------------------
+
+====== Threshold Inference Results ======
+Exit Distribution: [37.18, 36.35, 21.29, 3.01, 1.13, 1.04]
+Total samples processed: 10000
+
+== Accuracy per Exit Point ==
+Exit 1: 87.82% (3265/3718)
+Exit 2: 86.35% (3139/3635)
+Exit 3: 74.50% (1586/2129)
+Exit 4: 69.44% (209/301)
+Exit 5: 71.68% (81/113)
+Main Exit: 33.65% (35/104)
+
+== Per-Class Accuracy ==
+airplane: 85.10% (851/1000)
+automobile: 92.00% (920/1000)
+bird: 74.20% (742/1000)
+cat: 68.40% (684/1000)
+deer: 80.00% (800/1000)
+dog: 79.90% (799/1000)
+frog: 92.00% (920/1000)
+horse: 90.50% (905/1000)
+ship: 82.70% (827/1000)
+truck: 86.70% (867/1000)
+
+== Exit Distribution per Class ==
+airplane: Exit1: 36.6%, Exit2: 42.7%, Exit3: 17.4%, Exit4: 1.9%, Exit5: 0.8%, Main: 0.6%
+automobile: Exit1: 78.0%, Exit2: 17.4%, Exit3: 4.0%, Exit4: 0.2%, Exit5: 0.3%, Main: 0.1%
+bird: Exit1: 11.1%, Exit2: 44.1%, Exit3: 37.5%, Exit4: 4.0%, Exit5: 1.9%, Main: 1.4%
+cat: Exit1: 9.0%, Exit2: 44.4%, Exit3: 35.9%, Exit4: 6.4%, Exit5: 2.1%, Main: 2.2%
+deer: Exit1: 5.9%, Exit2: 45.7%, Exit3: 38.2%, Exit4: 6.0%, Exit5: 2.7%, Main: 1.5%
+dog: Exit1: 24.1%, Exit2: 40.0%, Exit3: 30.0%, Exit4: 3.4%, Exit5: 1.2%, Main: 1.3%
+frog: Exit1: 50.2%, Exit2: 28.3%, Exit3: 16.9%, Exit4: 2.8%, Exit5: 0.7%, Main: 1.1%
+horse: Exit1: 50.9%, Exit2: 30.0%, Exit3: 14.0%, Exit4: 3.1%, Exit5: 0.9%, Main: 1.1%
+ship: Exit1: 36.5%, Exit2: 47.5%, Exit3: 13.6%, Exit4: 1.3%, Exit5: 0.3%, Main: 0.8%
+truck: Exit1: 69.5%, Exit2: 23.4%, Exit3: 5.4%, Exit4: 1.0%, Exit5: 0.4%, Main: 0.3%
+
+------------------------------ branch resnet50 ------------------------------
+
+====== Threshold Inference Results ======
+Exit Distribution: [19.39, 14.79, 24.62, 27.33, 9.58, 4.29]
+Total samples processed: 10000
+
+== Accuracy per Exit Point ==
+Exit 1: 92.16% (1787/1939)
+Exit 2: 92.83% (1373/1479)
+Exit 3: 92.24% (2271/2462)
+Exit 4: 93.27% (2549/2733)
+Exit 5: 93.74% (898/958)
+Main Exit: 62.24% (267/429)
+
+== Per-Class Accuracy ==
+airplane: 91.90% (919/1000)
+automobile: 94.00% (940/1000)
+bird: 88.00% (880/1000)
+cat: 83.90% (839/1000)
+deer: 92.00% (920/1000)
+dog: 89.70% (897/1000)
+frog: 95.00% (950/1000)
+horse: 95.10% (951/1000)
+ship: 91.70% (917/1000)
+truck: 93.20% (932/1000)
+
+== Exit Distribution per Class ==
+airplane: Exit1: 15.4%, Exit2: 16.3%, Exit3: 28.2%, Exit4: 28.9%, Exit5: 7.0%, Main: 4.2%
+automobile: Exit1: 48.6%, Exit2: 17.0%, Exit3: 20.2%, Exit4: 11.3%, Exit5: 1.9%, Main: 1.0%
+bird: Exit1: 1.9%, Exit2: 6.6%, Exit3: 22.1%, Exit4: 48.6%, Exit5: 15.1%, Main: 5.7%
+cat: Exit1: 2.1%, Exit2: 5.3%, Exit3: 22.7%, Exit4: 43.5%, Exit5: 17.8%, Main: 8.6%
+deer: Exit1: 1.1%, Exit2: 7.3%, Exit3: 31.8%, Exit4: 35.6%, Exit5: 18.4%, Main: 5.8%
+dog: Exit1: 9.0%, Exit2: 8.7%, Exit3: 29.8%, Exit4: 36.2%, Exit5: 10.4%, Main: 5.9%
+frog: Exit1: 12.7%, Exit2: 33.2%, Exit3: 22.6%, Exit4: 18.4%, Exit5: 9.0%, Main: 4.1%
+horse: Exit1: 26.2%, Exit2: 16.7%, Exit3: 23.5%, Exit4: 21.8%, Exit5: 9.1%, Main: 2.7%
+ship: Exit1: 31.9%, Exit2: 12.5%, Exit3: 29.6%, Exit4: 18.8%, Exit5: 4.6%, Main: 2.6%
+truck: Exit1: 45.0%, Exit2: 24.3%, Exit3: 15.7%, Exit4: 10.2%, Exit5: 2.5%, Main: 2.3%
+
+
+------------------------------ branch resnet50 ------------------------------
+
+Test Loss: 0.6193, Test Accuracy: 96.50%, Exit 1 Accuracy: 67.39%, Exit 2 Accuracy: 76.58%, Exit 3 Accuracy: 92.53%, Exit 4 Accuracy: 96.40%
+
+====== Threshold Inference Results ======
+Exit Distribution: [22.4, 16.95, 44.13, 10.13, 6.39]
+Total samples processed: 10000
+
+== Accuracy per Exit Point ==
+Exit 1: 96.52% (2162/2240)
+Exit 2: 96.81% (1641/1695)
+Exit 3: 96.58% (4262/4413)
+Exit 4: 96.84% (981/1013)
+Main Exit: 71.83% (459/639)
+
+== Per-Class Accuracy ==
+airplane: 96.20% (962/1000)
+automobile: 97.30% (973/1000)
+bird: 92.60% (926/1000)
+cat: 88.30% (883/1000)
+deer: 95.50% (955/1000)
+dog: 93.10% (931/1000)
+frog: 98.70% (987/1000)
+horse: 97.40% (974/1000)
+ship: 96.10% (961/1000)
+truck: 95.30% (953/1000)
+
+== Exit Distribution per Class ==
+airplane: Exit1: 21.2%, Exit2: 11.4%, Exit3: 51.6%, Exit4: 7.7%, Main: 8.1%
+automobile: Exit1: 42.9%, Exit2: 27.2%, Exit3: 26.1%, Exit4: 2.3%, Main: 1.5%
+bird: Exit1: 13.2%, Exit2: 7.7%, Exit3: 54.4%, Exit4: 15.6%, Main: 9.1%
+cat: Exit1: 1.5%, Exit2: 5.8%, Exit3: 58.2%, Exit4: 17.0%, Main: 17.5%
+deer: Exit1: 1.6%, Exit2: 11.7%, Exit3: 66.7%, Exit4: 12.6%, Main: 7.4%
+dog: Exit1: 10.1%, Exit2: 17.6%, Exit3: 48.0%, Exit4: 15.2%, Main: 9.1%
+frog: Exit1: 25.5%, Exit2: 28.2%, Exit3: 33.8%, Exit4: 9.8%, Main: 2.7%
+horse: Exit1: 26.7%, Exit2: 20.6%, Exit3: 37.2%, Exit4: 11.7%, Main: 3.8%
+ship: Exit1: 25.7%, Exit2: 27.0%, Exit3: 38.5%, Exit4: 7.0%, Main: 1.8%
+truck: Exit1: 55.6%, Exit2: 12.3%, Exit3: 26.8%, Exit4: 2.4%, Main: 2.9%

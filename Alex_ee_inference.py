@@ -260,6 +260,136 @@ def threshold_inference_new(model, category, dataloader, exit_thresholds):
 
     return classified_label, exit_point
 
+def threshold_inference_with_class_stats(model, dataloader, exit_thresholds, num_classes=10):
+    model.eval()
+
+    # Track correct predictions per class and exit point
+    class_correct = [[0 for _ in range(num_classes)] for _ in range(6)]  # 6 exits (5 early + main)
+    class_total = [0 for _ in range(num_classes)]
+    exit_counts = [0, 0, 0, 0, 0, 0]  # Count samples exiting at each point
+
+    # Track exit distribution per class
+    class_exit_distribution = [[0 for _ in range(6)] for _ in range(num_classes)]
+
+    with torch.no_grad():
+        for data in dataloader:
+            images, labels = data[0].to(device), data[1].to(device)
+
+            # Forward pass
+            main_out, exit1_out, exit2_out, exit3_out, exit4_out, exit5_out = model(images)
+
+            # Calculate softmax and entropy for all exits
+            softmax_exit1 = F.softmax(exit1_out, dim=1)
+            entropy_exit1 = -torch.sum(softmax_exit1 * torch.log(softmax_exit1 + 1e-5), dim=1)
+
+            softmax_exit2 = F.softmax(exit2_out, dim=1)
+            entropy_exit2 = -torch.sum(softmax_exit2 * torch.log(softmax_exit2 + 1e-5), dim=1)
+
+            softmax_exit3 = F.softmax(exit3_out, dim=1)
+            entropy_exit3 = -torch.sum(softmax_exit3 * torch.log(softmax_exit3 + 1e-5), dim=1)
+
+            softmax_exit4 = F.softmax(exit4_out, dim=1)
+            entropy_exit4 = -torch.sum(softmax_exit4 * torch.log(softmax_exit4 + 1e-5), dim=1)
+
+            softmax_exit5 = F.softmax(exit5_out, dim=1)
+            entropy_exit5 = -torch.sum(softmax_exit5 * torch.log(softmax_exit5 + 1e-5), dim=1)
+
+            # Process each sample
+            for i in range(labels.size(0)):
+                label = labels[i].item()
+                class_total[label] += 1
+
+                # Determine exit point based on entropy thresholds
+                if entropy_exit1[i] < exit_thresholds[0]:
+                    _, predicted = torch.max(exit1_out[i].data, 0)
+                    exit_point = 0
+                    exit_counts[0] += 1
+                    class_exit_distribution[label][0] += 1
+                    if predicted == label:
+                        class_correct[0][label] += 1
+
+                elif entropy_exit2[i] < exit_thresholds[1]:
+                    _, predicted = torch.max(exit2_out[i].data, 0)
+                    exit_point = 1
+                    exit_counts[1] += 1
+                    class_exit_distribution[label][1] += 1
+                    if predicted == label:
+                        class_correct[1][label] += 1
+
+                elif entropy_exit3[i] < exit_thresholds[2]:
+                    _, predicted = torch.max(exit3_out[i].data, 0)
+                    exit_point = 2
+                    exit_counts[2] += 1
+                    class_exit_distribution[label][2] += 1
+                    if predicted == label:
+                        class_correct[2][label] += 1
+
+                elif entropy_exit4[i] < exit_thresholds[3]:
+                    _, predicted = torch.max(exit4_out[i].data, 0)
+                    exit_point = 3
+                    exit_counts[3] += 1
+                    class_exit_distribution[label][3] += 1
+                    if predicted == label:
+                        class_correct[3][label] += 1
+
+                elif entropy_exit5[i] < exit_thresholds[4]:
+                    _, predicted = torch.max(exit5_out[i].data, 0)
+                    exit_point = 4
+                    exit_counts[4] += 1
+                    class_exit_distribution[label][4] += 1
+                    if predicted == label:
+                        class_correct[4][label] += 1
+
+                else:
+                    _, predicted = torch.max(main_out[i].data, 0)
+                    exit_point = 5
+                    exit_counts[5] += 1
+                    class_exit_distribution[label][5] += 1
+                    if predicted == label:
+                        class_correct[5][label] += 1
+
+    # Calculate and print results
+    total_samples = sum(class_total)
+    exit_ratios = [100 * count / total_samples for count in exit_counts]
+
+    # Class names for CIFAR-10
+    classes = ['airplane', 'automobile', 'bird', 'cat', 'deer',
+               'dog', 'frog', 'horse', 'ship', 'truck']
+
+    print("\n====== Threshold Inference Results ======")
+    print(f"Exit Distribution: {exit_ratios}")
+    print(f"Total samples processed: {total_samples}")
+
+    # Print per-exit accuracy
+    print("\n== Accuracy per Exit Point ==")
+    for exit_idx in range(6):
+        exit_name = f"Exit {exit_idx + 1}" if exit_idx < 5 else "Main Exit"
+        if exit_counts[exit_idx] > 0:
+            exit_correct = sum(class_correct[exit_idx])
+            exit_acc = 100 * exit_correct / exit_counts[exit_idx]
+            print(f"{exit_name}: {exit_acc:.2f}% ({exit_correct}/{exit_counts[exit_idx]})")
+        else:
+            print(f"{exit_name}: N/A (0 samples)")
+
+    # Print per-class accuracy
+    print("\n== Per-Class Accuracy ==")
+    for class_idx in range(num_classes):
+        if class_total[class_idx] > 0:
+            class_correct_total = sum(class_correct[exit_idx][class_idx] for exit_idx in range(6))
+            class_acc = 100 * class_correct_total / class_total[class_idx]
+            print(f"{classes[class_idx]}: {class_acc:.2f}% ({class_correct_total}/{class_total[class_idx]})")
+
+    # Print exit distribution per class
+    print("\n== Exit Distribution per Class ==")
+    for class_idx in range(num_classes):
+        if class_total[class_idx] > 0:
+            dist = [100 * class_exit_distribution[class_idx][exit_idx] / class_total[class_idx]
+                    for exit_idx in range(6)]
+            print(f"{classes[class_idx]}: Exit1: {dist[0]:.1f}%, Exit2: {dist[1]:.1f}%, "
+                  f"Exit3: {dist[2]:.1f}%, Exit4: {dist[3]:.1f}%, Exit5: {dist[4]:.1f}%, Main: {dist[5]:.1f}%")
+
+    return exit_ratios, class_correct, class_total, class_exit_distribution
+
 if __name__ == '__main__':
 
     # Initialize TensorBoard
@@ -307,6 +437,9 @@ if __name__ == '__main__':
     print("---------------------------------")
     print(f"threshold_inference Accuracy: {accuracy}")
     print(f"threshold_inference Exit Ratios: {exit_ratios}")
+
+    # branch classifier results
+    # threshold_inference_with_class_stats(model, testloader, optimal_thresholds)
 
     # Log variables to TensorBoard
     writer.add_scalars('Accuracy', {
