@@ -685,6 +685,19 @@ def test_gen_dataset(testset_path, valset_path):
         dataset = TensorDataset(images, labels)  # Create a TensorDataset
         return dataset
 
+    def count_exits(exits_list):
+        """Count occurrences of each exit point (0-5) in the list"""
+        counts = [0] * 5  # Initialize counters for exits 0-5
+        for exit_point in exits_list:
+            if 0 <= exit_point < 5:  # Ensure valid exit point
+                counts[exit_point] += 1
+
+        # Calculate percentages
+        total = sum(counts)
+        percentages = [100 * count / total if total > 0 else 0 for count in counts]
+
+        return counts, percentages
+
     # Load the datasets
     print("Loading datasets...")
     test_dataset = load_data(testset_path)
@@ -748,6 +761,18 @@ def test_gen_dataset(testset_path, valset_path):
     flat_train_exits = [item for sublist in trainset_exits for item in sublist]
     flat_ori_exits = [item for sublist in ori_trainset_exits for item in sublist]
 
+    # Count exits in both original and generated data
+    gen_counts, gen_percentages = count_exits(flat_train_exits)
+    ori_counts, ori_percentages = count_exits(flat_ori_exits)
+
+    # Print exit distribution comparison
+    print("\n=== Exit Distribution Analysis ===")
+    print("Exit | Original Count (%) | Generated Count (%)")
+    print("-" * 50)
+    for i in range(5):
+        print(f"Exit {i} | {ori_counts[i]} ({ori_percentages[i]:.2f}%) | {gen_counts[i]} ({gen_percentages[i]:.2f}%)")
+    print("-" * 50)
+
     # Calculate differences
     diff = [b - a for a, b in zip(flat_train_exits, flat_ori_exits)]
     negative_count = sum(1 for value in diff if value < 0)
@@ -758,6 +783,7 @@ def test_gen_dataset(testset_path, valset_path):
     print(f"negative count: {negative_count} of {total_diff}")
     print(f"positive count: {positive_count} of {total_diff}")
     print(f"maintain count: {total_diff - positive_count - negative_count} of {total_diff}")
+
 
 def initialize_model(classifier_name):
 
@@ -843,7 +869,7 @@ if __name__ == "__main__":
         TRAIN = False
 
     classifier_name = "B_Resnet50"
-    category = 3 # 0 Airplane, 1 Automobile, 2 Bird, 3 Cat, 4 Deer, 5 Dog, 6 Frog, 7 Horse, 8 Ship, 9 Truck
+    category = 9 # 0 Airplane, 1 Automobile, 2 Bird, 3 Cat, 4 Deer, 5 Dog, 6 Frog, 7 Horse, 8 Ship, 9 Truck
     EE_LOSS_PARA = 100
 
     generator, classifier, resnet_for_cam, thresholds, device, trainloader, valloader, testloader = initialize_model(classifier_name)
@@ -857,6 +883,7 @@ if __name__ == "__main__":
         train(50)
     else:
         checkpoint = torch.load('training_weights/Generator224/Generator_epoch_50.pth')
+        # checkpoint = torch.load('weights/Generator224/resnet50/9_truck/Generator_epoch_40.pth')
         generator.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
