@@ -741,6 +741,45 @@ def threshold_inference_with_class_stats(model, dataloader, exit_thresholds, num
 
     return exit_ratios, class_correct, class_total, class_exit_distribution
 
+
+def white_board_test(image_path):
+    # Load and preprocess a single image for testing
+    from PIL import Image
+    from torchvision import transforms
+    import matplotlib.pyplot as plt
+    import torch.nn.functional as F
+
+    # Define the same transforms used for the test dataset
+    transform = transforms.Compose([
+        transforms.Resize(224),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+    ])
+
+    # Load and transform the image
+    image = Image.open(image_path).convert('RGB')
+    original_image = image.copy()  # Keep a copy for display
+    image_tensor = transform(image).unsqueeze(0).to(device)  # Add batch dimension and move to device
+
+    # Optimal thresholds for the BranchedResNet50
+    optimal_thresholds = [0.3, 0.45, 0.7, 0.05]
+
+    # Set model to evaluation mode
+    model.eval()
+
+    with torch.no_grad():
+        # Get the prediction and exit point using threshold_inference_new
+        classified_label, exit_point = threshold_inference_new(model, None, image_tensor, optimal_thresholds)
+
+    # Display results
+    plt.figure(figsize=(8, 6))
+    plt.imshow(original_image)
+    plt.axis('off')
+    plt.title(f'VGG16 EE pattern on Resnet50 \n'
+              f'label: {classified_label.item()} , Exit: {exit_point[0]}')
+    plt.show()
+
 if __name__ == '__main__':
 
     pl.seed_everything(2024)
@@ -758,7 +797,12 @@ if __name__ == '__main__':
         test()
     else:
         model.load_state_dict(torch.load(r"weights/Resnet50/B-Resnet50_epoch_10.pth", weights_only=True))
-        test()
+        # test()
+        white_board_test("Results/white_board/vgg16/3_cat/white_board_20250405_020418.png")
+        white_board_test("Results/white_board/vgg16/5_dog/white_board_20250404_222037.png")
+        white_board_test("Results/white_board/vgg16/6_frog/white_board_20250406_233829.png")
+        white_board_test("Results/white_board/vgg16/9_truck/white_board_20250405_193221.png")
+
 
     # ee_inference()
 

@@ -865,7 +865,7 @@ if __name__ == "__main__":
         WHITE_BOARD_TEST = False   # actually its black board test
         TRAIN = True
     else:
-        WHITE_BOARD_TEST = True   # actually its black board test
+        WHITE_BOARD_TEST = False   # actually its black board test
         TRAIN = False
 
     classifier_name = "B_Resnet50"

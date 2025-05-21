@@ -397,6 +397,43 @@ def threshold_inference_with_class_stats(model, dataloader, exit_thresholds, num
 
     return exit_ratios, class_correct, class_total, class_exit_distribution
 
+def white_board_test(image_path):
+    # Load and preprocess a single image for testing
+    from PIL import Image
+    from torchvision import transforms
+    import matplotlib.pyplot as plt
+    import torch.nn.functional as F
+
+    # Define the same transforms used for the test dataset
+    transform = transforms.Compose([
+        transforms.Resize(224),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+    ])
+
+    # Load and transform the image
+    image = Image.open(image_path).convert('RGB')
+    original_image = image.copy()  # Keep a copy for display
+    image_tensor = transform(image).unsqueeze(0).to(device)  # Add batch dimension and move to device
+
+    # Optimal thresholds for the BranchedResNet50
+    optimal_thresholds = [0.5, 0.5, 0.7, 0.85, 0.5]
+
+    # Set model to evaluation mode
+    model.eval()
+
+    with torch.no_grad():
+        # Get the prediction and exit point using threshold_inference_new
+        classified_label, exit_point = threshold_inference_new(model, None, image_tensor, optimal_thresholds)
+
+    # Display results
+    plt.figure(figsize=(8, 6))
+    plt.imshow(original_image)
+    plt.axis('off')
+    plt.title(f'Resnet50 EE pattern on VGG16 \n'
+              f'label: {classified_label.item()} , Exit: {exit_point[0]}')
+    plt.show()
 
 if __name__ == '__main__':
 
@@ -404,7 +441,12 @@ if __name__ == '__main__':
     dataprep = Data_prep_224_normal_N(root)
     trainloader, valloader, testloader = dataprep.create_loaders(batch_size=100, num_workers=2)
 
-    ee_inference()
+    # ee_inference()
+
+    white_board_test("Results/white_board/resnet50/0_airplane/white_board_20250403_171932.png")
+    white_board_test("Results/white_board/resnet50/2_bird/white_board_20250403_200709.png")
+    white_board_test("Results/white_board/resnet50/4_deer/white_board_20250404_001914.png")
+    white_board_test("Results/white_board/resnet50/6_frog/white_board_20250404_120430.png")
 
     # branch classifier results
     # optimal_thresholds = [0.5, 0.5, 0.7, 0.85, 0.5]
