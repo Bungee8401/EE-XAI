@@ -1,0 +1,111 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Image files
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+*.svg
+*.ico
+*.webp
+
+# Video files
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.mkv
+
+# Audio files
+*.mp3
+*.wav
+*.flac
+*.aac
+
+# Archive files
+*.zip
+*.tar
+*.gz
+*.rar
+*.7z
+*.tar.gz
+
+# Data files
+*.pkl
+*.csv
+*.json
+*.xml
+*.db
+*.sqlite
+
+# Dataset directories
+CIFAR10/
+CIFAR100/
+Tiny Imagenet/
+data_split/
+generated_samples/
+
+# Results and output directories
+Results/
+Tensorboard_data/
+test_results/
+running logs/
+tiny_imgnet log
+ViT_ee log
+
+# Model weights and checkpoints
+weights/
+training_weights/
+*.pth
+*.ckpt
+*.h5
+*.pkl
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# TensorBoard logs
+*.tfevents.*
+
+# Large files and datasets
+*.bin
+*.dat
+*.npy
+*.npz

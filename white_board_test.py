@@ -4,6 +4,7 @@ from PIL import Image
 from Alexnet_early_exit import BranchedAlexNet
 from Vgg16bn_early_exit_small_fc import BranchVGG16BN
 from Resnet50_ee import BranchedResNet50
+from ViT_ee import VisionTransformer
 
 def load_image(image_path):
     image = Image.open(image_path).convert('RGB')
@@ -24,6 +25,20 @@ def test_image_with_classifiers(image_path, classifier_name):
     elif classifier_name == 'B_Resnet50':
         classifier = BranchedResNet50()
         classifier.load_state_dict(torch.load('weights/Resnet50/B-Resnet50_epoch_10.pth', weights_only=True))
+    elif classifier_name == 'B_ViT':
+        classifier = VisionTransformer(
+                        img_size=224,
+                        patch_size=16,
+                        in_channels=3,
+                        n_classes=10,
+                        embed_dim=768,
+                        depth=12,
+                        n_heads=12,
+                        mlp_ratio=4.0,
+                        dropout=0.1,
+                        attention_dropout=0.1
+                    )
+        classifier.load_state_dict(torch.load('weights/vit_ee_cifar10_best.pth', weights_only=True))
 
     classifier.to(device)
     classifier.eval()
@@ -35,12 +50,14 @@ def test_image_with_classifiers(image_path, classifier_name):
             out_main, out_branch1, out_branch2, out_branch3, out_branch4, out_branch5 = classifier(image)
         elif classifier_name == 'B_Resnet50':
             out_main, out_branch1, out_branch2, out_branch3, out_branch4 = classifier(image)
+        elif classifier_name == 'B_ViT':
+            out_branch1, out_branch2, out_branch3, out_main = classifier(image)
 
         _, predicted = torch.max(out_main, 1)
         print(f'Predicted class: {predicted.item()}')
 
 if __name__ == "__main__":
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
 
     image_path = 'Results/March07Reports/vgg16/white board test/plot_2025-03-04 16-12-52_0.png'  # Replace with the path to your local image
     classifier_name = 'B_Vgg16'  # Replace with the classifier you want to use

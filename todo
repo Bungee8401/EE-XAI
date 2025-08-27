@@ -413,3 +413,130 @@ todo:   1. train more epochs only with 1st ext, see if white board test can be m
 
 todo:   1. resnet50 10 class pattern
         2. gard-cam dataset, retrain classifiers
+
+
+
+-------------------03.06 2025---------------------
+
+1. learn ViT and transformer
+
+
+
+--------------------04.06 2025---------------------
+
+1. learn ViT and transformer
+2. fine-tune vit 16 on cifar10
+    acc on train is 99%, on val is 96%
+    acc can be better
+
+ideas:
+    since vit 16 model is essentially:  12x transformer blocks, norm, head (linear)
+    we can use fewer transformer blocks to build early exit!
+
+--------------------05.06 2025---------------------
+
+1. previous idea works, use fewer transformer blocks to build early exit
+    - 3 6 9 as early exit
+    - 12 as the main exit
+
+2. found SGD optimizer is working better than adam after loading weights manually onto the ViT_ee
+
+3. training now. classification accuracy sudden drop after around 10 epochs. wondering why.
+    - could try:
+        1. even smaller lr
+        2. drop_out = 0.0
+        3.
+
+-------------------06.06 2025---------------------
+
+1. smaller lr works for 20 epochs.
+
+
+
+-------------------30.06 2025---------------------
+
+0.
+
+    ViT_CNN_ignore model
+        - also recognizes CIFAR10 EE feature
+        - can achieve high acc on tiny ImageNet, accuracy: 27.81, 38.88, 59.79, 88.73
+        - ready for test with generator
+
+
+    Resnet50 and VGG16 on CIFAR100
+        Resnet50, accuracy: 37.70%, 45.16%, 63.51%, 82.76%
+        VGG16, accuracy:   32.32%, 43.32%, 51.56%, 66.42%, 79.32%, 79.45%
+
+
+1. Generator test with resnet50 on CIFAR100
+
+    sweep LossPara [100, 300, 500] and category [0, ..., 99]
+        finished
+
+
+    based on the current results
+        the EE feature in CIFAR100 would suffer from low accuracy and small sample
+            - small sample size (500 imgs for each class)
+            - no guarantee that 100 features will be found, but at least 50%~60%
+            - the features' robustness across models is also uncertain
+
+
+        what can be done
+            - reduce data augmentation, use more mild transformations
+            - more epochs and smaller lr
+            -
+
+
+2. Generator test with ViT_CNN_ignore on Tiny ImageNet
+
+
+---------------------- 02.07 2025 ---------------------
+
+1. tiny imagenet one class data_loader
+2. vit_ee tiny imagenet class seems more reasonable, custom dataset class is wrong
+3. .class_to_idx function in dataset class may help
+
+
+
+
+
+
+
+
+
+
+---------------------- 04.07 2025 ---------------------
+
+1. debug ViT with Generator
+
+2. Tiny imagenet results seem reliable
+
+3. paper writing
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

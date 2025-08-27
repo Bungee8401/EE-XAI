@@ -5,12 +5,14 @@ import torch.nn as nn
 import torchvision
 import torchvision.models as models
 from torchvision import datasets
-import torchvision.transforms as transforms
+from torchvision import transforms
 from torch.utils.data import DataLoader, Subset, random_split, Dataset
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import show_cam_on_image
-
+from PIL import Image
+import numpy as np
+from collections import defaultdict
 
 trans_train = transforms.Compose([
     transforms.Resize((224, 224)),  # Resize to 224x224
@@ -158,8 +160,136 @@ def grad_cam_mask(label, images):
         #     plt.show()
     return masked_images
 
+def load_cifar100(batch_size, num_workers, class_idx):
+    import os
+    import torch
+    from torchvision import datasets, transforms
+    from torch.utils.data import DataLoader, Subset, random_split
+    import numpy as np
 
-root = '/home/yibo/PycharmProjects/Thesis/CIFAR10'
+    # Define transformations for CIFAR100
+    trans_train = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.RandomCrop(224, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(degrees=15),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
+    ])
+
+    trans_test = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
+    ])
+
+    # Create directory if it doesn't exist
+    os.makedirs("./CIFAR100", exist_ok=True)
+
+    # Load the full CIFAR100 dataset
+    train_set = datasets.CIFAR100(root='./CIFAR100', train=True, download=True, transform=None)
+    test_set = datasets.CIFAR100(root='./CIFAR100', train=False, download=True, transform=None)
+
+    # Filter by class if class_idx is provided - much faster way using numpy operations
+    if class_idx is not None:
+        if not (0 <= class_idx <= 99):
+            raise ValueError("class_idx must be between 0 and 99")
+
+        # Get class indices using numpy for speed
+        train_indices = np.where(np.array(train_set.targets) == class_idx)[0].tolist()
+        test_indices = np.where(np.array(test_set.targets) == class_idx)[0].tolist()
+
+        print(f"Filtered to class {class_idx}: {len(train_indices)} training, {len(test_indices)} test samples")
+    else:
+        # Use all indices if no class filtering
+        train_indices = list(range(len(train_set)))
+        test_indices = list(range(len(test_set)))
+
+    # Apply transforms after filtering
+    train_set.transform = trans_train
+    test_set.transform = trans_test
+
+    # Create subsets with the filtered indices
+    train_set = Subset(train_set, train_indices)
+    test_set = Subset(test_set, test_indices)
+
+    # Split training set into training and validation (90/10)
+    train_size = int(0.9 * len(train_set))
+    val_size = len(train_set) - train_size
+    trainset, valset = random_split(train_set, [train_size, val_size])
+
+    # Create DataLoaders
+    trainloader = DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    valloader = DataLoader(valset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    testloader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+
+    print(f"CIFAR100 dataset loaded: {len(trainset)} training, {len(valset)} validation, {len(test_set)} test samples")
+    print(f"Train batch count: {len(trainloader)}, Val batch count: {len(valloader)}, Test batch count: {len(testloader)}")
+
+    return trainloader, valloader, testloader
+
+
+def load_cifar100_generator(batch_size, num_workers, class_idx):
+    import os
+    import torch
+    from torchvision import datasets, transforms
+    from torch.utils.data import DataLoader, Subset, random_split
+    import numpy as np
+
+    # Define transformations for CIFAR100
+    trans_test = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
+    ])
+
+    # Create directory if it doesn't exist
+    os.makedirs('./CIFAR100', exist_ok=True)
+
+    # Load the full CIFAR100 dataset
+    train_set = datasets.CIFAR100(root='./CIFAR100', train=True, download=True, transform=None)
+    test_set = datasets.CIFAR100(root='./CIFAR100', train=False, download=True, transform=None)
+
+
+    # Filter by class if class_idx is provided - much faster way using numpy operations
+    if class_idx is not None:
+        if not (0 <= class_idx <= 99):
+            raise ValueError("class_idx must be between 0 and 99")
+
+        # Get class indices using numpy for speed
+        train_indices = np.where(np.array(train_set.targets) == class_idx)[0].tolist()
+        test_indices = np.where(np.array(test_set.targets) == class_idx)[0].tolist()
+
+        print(f"Filtered to class {class_idx}: {len(train_indices)} training, {len(test_indices)} test samples")
+    else:
+        # Use all indices if no class filtering
+        train_indices = list(range(len(train_set)))
+        test_indices = list(range(len(test_set)))
+
+    # Apply transforms after filtering
+    train_set.transform = trans_test
+    test_set.transform = trans_test
+
+    # Create subsets with the filtered indices
+    train_set = Subset(train_set, train_indices)
+    test_set = Subset(test_set, test_indices)
+
+    # Split training set into training and validation (90/10)
+    train_size = int(0.9 * len(train_set))
+    val_size = len(train_set) - train_size
+    trainset, valset = random_split(train_set, [train_size, val_size])
+
+    # Create DataLoaders
+    trainloader = DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    valloader = DataLoader(valset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    testloader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+
+    print(f"CIFAR100 dataset loaded: {len(trainset)} training, {len(valset)} validation, {len(test_set)} test samples")
+    print(f"Train batch count: {len(trainloader)}, Val batch count: {len(valloader)}, Test batch count: {len(testloader)}")
+
+    return trainloader, valloader, testloader
+
 
 class Data_prep_224_normal_N:
     def __init__(self, root):
@@ -487,14 +617,320 @@ def create_cifar224_gradcam():
     print("CIFAR224_GRADCAM dataset creation complete")
 
 
-if __name__ == '__main__':
-    # root = 'D:/Study/Module/Master Thesis/dataset/CIFAR10'
-    # dataprep = Data_prep_224_normal_N(root)
-    #
-    # train_idx, val_idx, test_idx = dataprep.get_category_index(0)
-    # train_loader, val_loader, test_loader = dataprep.create_loaders(100, 2)
+root = '/home/yibo/PycharmProjects/Thesis/CIFAR10'
 
-    # print(train_idx)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    create_cifar224_gradcam()
+# CIFAR-100 superclass mapping
+CIFAR100_SUPERCLASS_MAPPING = {
+    0: [4, 30, 55, 72, 95],  # aquatic mammals
+    1: [1, 32, 67, 73, 91],  # fish
+    2: [54, 62, 70, 82, 92],  # flowers
+    3: [9, 10, 16, 28, 61],  # food containers
+    4: [0, 51, 53, 57, 83],  # fruit and vegetables
+    5: [22, 39, 40, 86, 87],  # household electrical devices
+    6: [5, 20, 25, 84, 94],  # household furniture
+    7: [6, 7, 14, 18, 24],  # insects
+    8: [3, 42, 43, 88, 97],  # large carnivores
+    9: [12, 17, 37, 68, 76],  # large man-made outdoor things
+    10: [23, 33, 49, 60, 71],  # large natural outdoor scenes
+    11: [15, 19, 21, 31, 38],  # large omnivores and herbivores
+    12: [34, 63, 64, 66, 75],  # medium-sized mammals
+    13: [26, 45, 77, 79, 99],  # non-insect invertebrates
+    14: [2, 11, 35, 46, 98],  # people
+    15: [27, 29, 44, 78, 93],  # reptiles
+    16: [36, 50, 65, 74, 80],  # small mammals
+    17: [47, 52, 56, 59, 96],  # trees
+    18: [8, 13, 48, 58, 90],  # vehicles 1
+    19: [41, 69, 81, 85, 89]  # vehicles 2
+}
+
+# Superclass names
+SUPERCLASS_NAMES = [
+    'aquatic_mammals', 'fish', 'flowers', 'food_containers', 'fruit_and_vegetables',
+    'household_electrical_devices', 'household_furniture', 'insects', 'large_carnivores',
+    'large_man_made_outdoor_things', 'large_natural_outdoor_scenes', 'large_omnivores_and_herbivores',
+    'medium_sized_mammals', 'non_insect_invertebrates', 'people', 'reptiles',
+    'small_mammals', 'trees', 'vehicles_1', 'vehicles_2'
+]
+
+
+class CIFAR100SuperclassDataset(Dataset):
+    """Custom dataset for CIFAR-100 superclass data"""
+
+    def __init__(self, original_dataset, superclass_id, fine_to_coarse_mapping):
+        self.original_dataset = original_dataset
+        self.superclass_id = superclass_id
+        self.fine_classes = CIFAR100_SUPERCLASS_MAPPING[superclass_id]
+
+        # Find indices of samples belonging to this superclass
+        self.indices = []
+        for idx, (_, label) in enumerate(original_dataset):
+            if label in self.fine_classes:
+                self.indices.append(idx)
+
+        # Create label mapping for this superclass (0 to 4)
+        self.label_mapping = {fine_class: i for i, fine_class in enumerate(self.fine_classes)}
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, idx):
+        original_idx = self.indices[idx]
+        image, original_label = self.original_dataset[original_idx]
+        # Map to superclass-specific label (0-4)
+        new_label = self.label_mapping[original_label]
+        return image, new_label
+
+
+def create_cifar100_superclass_dataloaders(data_dir='./data', superclass_id=0, batch_size=32,
+                                           num_workers=2, train=True, shuffle=True):
+    """
+    Create dataloaders for each CIFAR-100 superclass
+
+    Args:
+        data_dir: Directory to store/load CIFAR-100 data
+        batch_size: Batch size for dataloaders
+        num_workers: Number of workers for data loading
+        train: Whether to load training or test data
+        shuffle: Whether to shuffle the data
+
+    Returns:
+        Dictionary mapping superclass names to their dataloaders
+    """
+
+    # Define transforms
+    transform = transforms.Compose([
+        transforms.Resize(224),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5071, 0.4865, 0.4409), (0.2673, 0.2564, 0.2762))])
+
+    # Load CIFAR-100 dataset
+    cifar100_dataset = torchvision.datasets.CIFAR100(root=data_dir, train=train, download=True, transform=transform)
+
+    # Create fine-to-coarse mapping
+    fine_to_coarse = {}
+    for coarse_id, fine_classes in CIFAR100_SUPERCLASS_MAPPING.items():
+        for fine_class in fine_classes:
+            fine_to_coarse[fine_class] = coarse_id
+
+    superclass_name = SUPERCLASS_NAMES[superclass_id]
+
+    # Create superclass dataset
+    superclass_dataset = CIFAR100SuperclassDataset(
+        cifar100_dataset, superclass_id, fine_to_coarse
+    )
+
+    # Create dataloader
+    dataloader = DataLoader(
+        superclass_dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=num_workers,
+        pin_memory=True if torch.cuda.is_available() else False
+    )
+
+
+    print(f"Created dataloader for '{superclass_name}' with {len(superclass_dataset)} samples")
+
+    return dataloader
+
+
+def get_superclass_info():
+    """Get information about CIFAR-100 superclasses"""
+    info = {}
+    for superclass_id, superclass_name in enumerate(SUPERCLASS_NAMES):
+        fine_classes = CIFAR100_SUPERCLASS_MAPPING[superclass_id]
+        info[superclass_name] = {
+            'superclass_id': superclass_id,
+            'fine_classes': fine_classes,
+            'num_fine_classes': len(fine_classes)
+        }
+    return info
+
+
+class CIFAR100CoarseDataset(Dataset):
+    """Custom dataset for CIFAR-100 with coarse (superclass) labels"""
+
+    def __init__(self, original_dataset):
+        self.original_dataset = original_dataset
+
+        # Create fine-to-coarse mapping
+        self.fine_to_coarse = {}
+        for coarse_id, fine_classes in CIFAR100_SUPERCLASS_MAPPING.items():
+            for fine_class in fine_classes:
+                self.fine_to_coarse[fine_class] = coarse_id
+
+    def __len__(self):
+        return len(self.original_dataset)
+
+    def __getitem__(self, idx):
+        image, fine_label = self.original_dataset[idx]
+        # Map fine label to coarse label (0-19)
+        coarse_label = self.fine_to_coarse[fine_label]
+        return image, coarse_label
+
+
+def create_cifar100_coarse_dataloaders(data_dir='./data', batch_size=32,
+                                       num_workers=2, shuffle_train=True):
+    """
+    Create three dataloaders (train, val, test) for CIFAR-100 with coarse labels (20 superclasses)
+
+    Args:
+        data_dir: Directory to store/load CIFAR-100 data
+        batch_size: Batch size for dataloaders
+        num_workers: Number of workers for data loading
+        shuffle_train: Whether to shuffle training data
+
+    Returns:
+        Tuple of (train_loader, val_loader, test_loader)
+        - train_loader: Training set (80% of original train set)
+        - val_loader: Validation set (20% of original train set)
+        - test_loader: Test set (original test set)
+    """
+
+    # Define transforms
+    train_transform = transforms.Compose([
+        transforms.Resize(224),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5071, 0.4865, 0.4409), (0.2673, 0.2564, 0.2762))
+    ])
+
+    test_transform = transforms.Compose([
+        transforms.Resize(224),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5071, 0.4865, 0.4409), (0.2673, 0.2564, 0.2762))
+    ])
+
+    # Load CIFAR-100 datasets
+    cifar100_train_raw = torchvision.datasets.CIFAR100(
+        root=data_dir, train=True, download=True, transform=train_transform
+    )
+
+    cifar100_test_raw = torchvision.datasets.CIFAR100(
+        root=data_dir, train=False, download=True, transform=test_transform
+    )
+
+    # Create coarse label datasets
+    cifar100_train = CIFAR100CoarseDataset(cifar100_train_raw)
+    cifar100_test = CIFAR100CoarseDataset(cifar100_test_raw)
+
+    # Split training set into train and validation (80/20 split)
+    train_size = int(0.9 * len(cifar100_train))
+    val_size = len(cifar100_train) - train_size
+
+    # Create stratified split to ensure balanced classes
+    train_indices, val_indices = create_stratified_split(
+        cifar100_train, train_size, val_size
+    )
+
+    train_dataset = Subset(cifar100_train, train_indices)
+    val_dataset = Subset(cifar100_train, val_indices)
+
+    # Create dataloaders
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=shuffle_train,
+        num_workers=num_workers,
+        pin_memory=True if torch.cuda.is_available() else False
+    )
+
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=True if torch.cuda.is_available() else False
+    )
+
+    test_loader = DataLoader(
+        cifar100_test,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=True if torch.cuda.is_available() else False
+    )
+
+    print(f"Created CIFAR-100 coarse dataloaders:")
+    print(f"  Train: {len(train_dataset)} samples")
+    print(f"  Val: {len(val_dataset)} samples")
+    print(f"  Test: {len(cifar100_test)} samples")
+    print(f"  Total superclasses: 20")
+
+    return train_loader, val_loader, test_loader
+
+
+def create_stratified_split(dataset, train_size, val_size):
+    """Create stratified split ensuring balanced classes in train and validation sets"""
+
+    # Get all labels
+    labels = []
+    for i in range(len(dataset)):
+        _, label = dataset[i]
+        labels.append(label)
+
+    labels = np.array(labels)
+
+    # Create stratified split
+    train_indices = []
+    val_indices = []
+
+    for class_id in range(20):  # 20 superclasses
+        class_indices = np.where(labels == class_id)[0]
+        class_train_size = int(len(class_indices) * 0.9)
+
+        # Shuffle indices for this class
+        np.random.shuffle(class_indices)
+
+        train_indices.extend(class_indices[:class_train_size])
+        val_indices.extend(class_indices[class_train_size:])
+
+    return train_indices, val_indices
+
+
+def get_coarse_class_names():
+    """Get the names of all 20 superclasses"""
+    return SUPERCLASS_NAMES
+
+# Example usage
+if __name__ == "__main__":
+    # Create train dataloaders for all superclasses
+    train_dataloader = create_cifar100_superclass_dataloaders(
+        data_dir='./CIFAR100',
+        superclass_id=0,
+        batch_size=64,
+        num_workers=4,
+        train=True,
+        shuffle=True
+    )
+
+    # Create test dataloaders for all superclasses
+    test_dataloader = create_cifar100_superclass_dataloaders(
+        data_dir='./CIFAR100',
+        superclass_id=0,
+        batch_size=64,
+        num_workers=4,
+        train=False,
+        shuffle=False
+    )
+
+    print(f"\nExample: 'aquatic_mammals' superclass")
+    print(f"Number of batches: {len(train_dataloader)}")
+
+    # Get first batch
+    for batch_idx, (images, labels) in enumerate(train_dataloader):
+        print(f"Batch {batch_idx}: Images shape: {images.shape}, Labels: {labels[:10]}")
+        break
+
+    # Print superclass information
+    print("\nSuperclass Information:")
+    superclass_info = get_superclass_info()
+    for name, info in superclass_info.items():
+        print(f"{name}: {info['num_fine_classes']} fine classes, "
+              f"fine class IDs: {info['fine_classes']}")
+
+
+
+
+
+

@@ -8,7 +8,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from torchvision import models
 from torchvision.models import resnet50
 import time
-from CustomDataset import Data_prep_224_normal_N
+from CustomDataset import Data_prep_224_normal_N, load_cifar100, create_cifar100_coarse_dataloaders
 
 class ResNet50(nn.Module):
     def __init__(self, num_classes=10):
@@ -146,16 +146,20 @@ class BranchedResNet50(nn.Module):
 
         return x
 
-def initialize_model():
 
-    pl.seed_everything(2024)
+def initialize_model(dataset_type, batch_size, num_workers, class_idx=None):
+
     # Check for GPU availability
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 
+    # Initialize the model
+    if dataset_type == 'cifar100':
+        model = BranchedResNet50(num_classes=20).to(device)
+    else:  # cifar10
+        model = BranchedResNet50(num_classes=10).to(device)
+
+    # Load pretrained weights
     resnet = resnet50(weights='IMAGENET1K_V1')
-
-    # Initialize the BranchedResNet50 model
-    model = BranchedResNet50(num_classes=10).to(device)
 
     # Copy the weights from the pretrained ResNet50 model to the BranchedResNet50 model
     model.conv1.load_state_dict(resnet.conv1.state_dict())
@@ -166,13 +170,27 @@ def initialize_model():
     model.layer4.load_state_dict(resnet.layer4.state_dict())
     model.avgpool.load_state_dict(resnet.avgpool.state_dict())
 
-    root = '/home/yibo/PycharmProjects/Thesis/CIFAR10'
-    dataprep = Data_prep_224_normal_N(root)
-    trainloader, valloader, testloader = dataprep.create_loaders(batch_size=128, num_workers=2)
+    # Load the appropriate dataset
+    if dataset_type == 'cifar100':
+        # trainloader, valloader, testloader = load_cifar100(batch_size=batch_size,
+        #                                                    num_workers=num_workers,
+        #                                                    class_idx=class_idx)
+
+        trainloader, valloader, testloader = create_cifar100_coarse_dataloaders(
+            data_dir='./CIFAR100',
+            batch_size=batch_size,
+            num_workers=num_workers,
+            shuffle_train=True
+        )
+    else:  # cifar10
+        root = '/home/yibo/PycharmProjects/Thesis/CIFAR10'
+        dataprep = Data_prep_224_normal_N(root)
+        trainloader, valloader, testloader = dataprep.create_loaders(batch_size=batch_size,
+                                                                     num_workers=num_workers)
 
     return model, device, trainloader, valloader, testloader
 
-def train(num_epochs):
+def train(num_epochs, dataset_type, class_idx=None):
     # Lists to store train and validation losses
     train_losses = []
     val_losses = []
@@ -182,6 +200,12 @@ def train(num_epochs):
     val_exit2 = []
     val_exit3 = []
     val_exit4 = []
+
+    # For early stopping and best model tracking
+    best_val_accuracy = 0.0
+    epochs_without_improvement = 0
+    best_model_state = None
+    early_stopping_patience = 10  # Number of epochs to wait before stopping
 
     scheduler = CosineAnnealingLR(optimizer, T_max=num_epochs)
 
@@ -209,7 +233,6 @@ def train(num_epochs):
             loss_main = criterion(main_out, labels)
 
             # Combine losses (average or weighted sum)
-            # loss_all = (loss_exit1 + loss_exit2 + loss_main) / 3
             loss_all = (  (1/5)*loss_exit1
                         + (1/4)*loss_exit2
                         + (1/3)*loss_exit3
@@ -254,7 +277,6 @@ def train(num_epochs):
                 loss_main = criterion(main_out, labels)
 
                 # Combine losses (average them for now)
-                # loss_all = (loss_exit1 + loss_exit2 + loss_main) / 3
                 loss_all = ((1 / 5) * loss_exit1
                             + (1 / 4) * loss_exit2
                             + (1 / 3) * loss_exit3
@@ -282,12 +304,32 @@ def train(num_epochs):
         val_loss /= len(valloader)
         val_losses.append(val_loss)
 
-        val_accuracies.append(100 * correct_val / total_val)
+        current_val_accuracy = 100 * correct_val / total_val
+        val_accuracies.append(current_val_accuracy)
         val_exit1.append(100 * correct_1 / total_val)
         val_exit2.append(100 * correct_2 / total_val)
         val_exit3.append(100 * correct_3 / total_val)
         val_exit4.append(100 * correct_4 / total_val)
 
+        # Check if this is the best validation accuracy
+        if current_val_accuracy > best_val_accuracy:
+            best_val_accuracy = current_val_accuracy
+            best_model_state = model.state_dict().copy()
+            epochs_without_improvement = 0
+            # Save the best model so far
+            save_path = f'/home/yibo/PycharmProjects/Thesis/training_weights/resnet50/'
+            if dataset_type == 'cifar100':
+                if class_idx is not None:
+                    best_model_path = save_path + f'B-Resnet50_cifar100_class{class_idx}_best.pth'
+                else:
+                    best_model_path = save_path + 'B-Resnet50_cifar100_best.pth'
+            else:
+                best_model_path = save_path + 'B-Resnet50_cifar10_best.pth'
+
+            torch.save(best_model_state, best_model_path)
+            print(f"New best validation accuracy: {best_val_accuracy:.2f}%")
+        else:
+            epochs_without_improvement += 1
 
         epoch_end_time = time.time()  # End time for the epoch
         epoch_elapsed_time = epoch_end_time - epoch_start_time
@@ -298,9 +340,14 @@ def train(num_epochs):
         print(f"Epoch [{epoch + 1}/{num_epochs}], main Train Accuracy: {train_accuracies[-1]:.2f}%, main Val Accuracy: {val_accuracies[-1]:.2f}%")
         print(f"Exit 1 val Accuracy: {val_exit1[-1]:.2f}%, Exit 2 val Accuracy: {val_exit2[-1]:.2f}%, Exit 3 val Accuracy: {val_exit3[-1]:.2f}%, Exit 4 val Accuracy: {val_exit4[-1]:.2f}%")
         print(f"Time per epoch: {int(epoch_hours)}h {int(epoch_minutes)}m {int(epoch_seconds)}s")
+        print(f"Best validation accuracy so far: {best_val_accuracy:.2f}%, Epochs without improvement: {epochs_without_improvement}")
 
+        # Early stopping check
+        if epochs_without_improvement >= early_stopping_patience:
+            print(f"No improvement for {early_stopping_patience} epochs. Stopping training.")
+            break
 
-        #save every 10 epochs
+        #save every 5 epochs
         if (epoch + 1) % 5 == 0:
             torch.save(model.state_dict(),
                        f'/home/yibo/PycharmProjects/Thesis/training_weights/resnet50/B-Resnet50_epoch_{epoch + 1}.pth')
@@ -308,12 +355,28 @@ def train(num_epochs):
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f"Training completed in: {elapsed_time // 60:.0f}m {elapsed_time % 60:.0f}s")
+    print(f"Best validation accuracy: {best_val_accuracy:.2f}%")
 
-    # Save the trained model
-    torch.save(model.state_dict(), '/home/yibo/PycharmProjects/Thesis/training_weights/resnet50/B-Resnet50_cifar10.pth')
+    # Load the best model before saving final results
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state)
+        print("Loaded the best model based on validation accuracy.")
+
+    # Save the trained model with appropriate name
+    save_path = f'/home/yibo/PycharmProjects/Thesis/training_weights/resnet50/'
+    if dataset_type == 'cifar100':
+        if class_idx is not None:
+            save_path += f'B-Resnet50_cifar100_class{class_idx}.pth'
+        else:
+            save_path += 'B-Resnet50_cifar100.pth'
+    else:
+        save_path += 'B-Resnet50_cifar10.pth'
+
+    torch.save(model.state_dict(), save_path)
 
     # Plotting the losses
-    epoch = range(1, len(train_losses) + 1)
+    epoch_count = len(train_losses)
+    epoch = range(1, epoch_count + 1)
 
     plt.figure(figsize=(12, 5))
 
@@ -332,6 +395,7 @@ def train(num_epochs):
     plt.plot(epoch, val_exit2, label='Exit 2 Accuracy')
     plt.plot(epoch, val_exit3, label='Exit 3 Accuracy')
     plt.plot(epoch, val_exit4, label='Exit 4 Accuracy')
+    plt.axhline(y=best_val_accuracy, color='r', linestyle='--', label=f'Best Val Acc: {best_val_accuracy:.2f}%')
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy')
     plt.title('Train and Validation Accuracy')
@@ -339,9 +403,13 @@ def train(num_epochs):
 
     plt.tight_layout()
 
+    # Save the plot
+    plt.savefig(f'/home/yibo/PycharmProjects/Thesis/Results/resnet50_training_{dataset_type}.png')
+
     # play_sound()
     plt.show()
     print('Finished Training')
+    print(f'Best validation accuracy: {best_val_accuracy:.2f}%')
 
 def test():
     # Test the model after training
@@ -593,7 +661,7 @@ def threshold_inference_new(model, category, dataloader, exit_thresholds):
 
     return classified_label, exit_point
 
-def ee_inference():
+def ee_inference(exit_thresholds):
     initial_thresholds = [1.0] * 5  # max entropy is 2.3 for 10 class problem, but starting at 1.0 is just faster
 
     initial_accuracy = simple_inference(model, testloader)
@@ -612,7 +680,7 @@ def ee_inference():
         print(f"threshold_finder Accuracies: {best_accuracies}")
         print(f"threshold_finder Exit Ratios: {best_exit_ratios}")
     else:
-        optimal_thresholds = [0.3, 0.45, 0.7, 0.05]
+        optimal_thresholds = exit_thresholds
         print(f"optimal Thresholds already found: {optimal_thresholds}")
 
     # Do threshold inference, also store the wrong imgs locally
@@ -622,7 +690,7 @@ def ee_inference():
     print(f"threshold_inference Accuracy: {accuracy}")
     print(f"threshold_inference Exit Ratios: {exit_ratios}")
 
-def threshold_inference_with_class_stats(model, dataloader, exit_thresholds, num_classes=10):
+def threshold_inference_with_class_stats(model, dataloader, exit_thresholds, num_classes):
     model.eval()
 
     # Track correct predictions per class and exit point
@@ -704,8 +772,20 @@ def threshold_inference_with_class_stats(model, dataloader, exit_thresholds, num
     exit_ratios = [100 * count / total_samples for count in exit_counts]
 
     # Class names for CIFAR-10
-    classes = ['airplane', 'automobile', 'bird', 'cat', 'deer',
-               'dog', 'frog', 'horse', 'ship', 'truck']
+    if num_classes == 10:  # CIFAR-10
+        classes = ['airplane', 'automobile', 'bird', 'cat', 'deer',
+                   'dog', 'frog', 'horse', 'ship', 'truck']
+    elif num_classes == 100:  # CIFAR-100
+        # For CIFAR-100, use class indices instead of names to avoid long output
+        classes = [f'Class {i}' for i in range(100)]
+        # Import CIFAR-100 class names if available
+        try:
+            from torchvision.datasets import CIFAR100
+            dataset = CIFAR100(root='CIFAR100', train=False, download=False)
+            if hasattr(dataset, 'classes'):
+                classes = dataset.classes
+        except:
+            pass
 
     print("\n====== Threshold Inference Results ======")
     print(f"Exit Distribution: {exit_ratios}")
@@ -722,25 +802,40 @@ def threshold_inference_with_class_stats(model, dataloader, exit_thresholds, num
         else:
             print(f"{exit_name}: N/A (0 samples)")
 
-    # Print per-class accuracy
-    print("\n== Per-Class Accuracy ==")
+    # Print per-class accuracy (top 10 highest and lowest)
+    print("\n== Per-Class Accuracy (Top 10 Highest) ==")
+    class_accuracies = []
     for class_idx in range(num_classes):
         if class_total[class_idx] > 0:
             class_correct_total = sum(class_correct[exit_idx][class_idx] for exit_idx in range(5))
             class_acc = 100 * class_correct_total / class_total[class_idx]
-            print(f"{classes[class_idx]}: {class_acc:.2f}% ({class_correct_total}/{class_total[class_idx]})")
+            class_accuracies.append((class_idx, class_acc))
 
-    # Print exit distribution per class
-    print("\n== Exit Distribution per Class ==")
-    for class_idx in range(num_classes):
-        if class_total[class_idx] > 0:
-            dist = [100 * class_exit_distribution[class_idx][exit_idx] / class_total[class_idx]
-                    for exit_idx in range(5)]
-            print(f"{classes[class_idx]}: Exit1: {dist[0]:.1f}%, Exit2: {dist[1]:.1f}%, "
-                  f"Exit3: {dist[2]:.1f}%, Exit4: {dist[3]:.1f}%, Main: {dist[4]:.1f}%")
+    # Sort by accuracy (highest first)
+    class_accuracies.sort(key=lambda x: x[1], reverse=True)
+
+    # Show top 10
+    for i, (class_idx, class_acc) in enumerate(class_accuracies[:10]):
+        class_correct_total = sum(class_correct[exit_idx][class_idx] for exit_idx in range(5))
+        print(f"{classes[class_idx]}: {class_acc:.2f}% ({class_correct_total}/{class_total[class_idx]})")
+
+    print("\n== Per-Class Accuracy (Bottom 10 Lowest) ==")
+    for i, (class_idx, class_acc) in enumerate(class_accuracies[-10:]):
+        class_correct_total = sum(class_correct[exit_idx][class_idx] for exit_idx in range(5))
+        print(f"{classes[class_idx]}: {class_acc:.2f}% ({class_correct_total}/{class_total[class_idx]})")
+
+    # Print exit distribution summary (average across classes)
+    print("\n== Exit Distribution Summary ==")
+    exit_distribution_avg = [0] * 5
+    for exit_idx in range(5):
+        exit_sum = sum(class_exit_distribution[class_idx][exit_idx] for class_idx in range(num_classes))
+        exit_distribution_avg[exit_idx] = 100 * exit_sum / total_samples
+
+    print(f"Exit1: {exit_distribution_avg[0]:.1f}%, Exit2: {exit_distribution_avg[1]:.1f}%, "
+          f"Exit3: {exit_distribution_avg[2]:.1f}%, Exit4: {exit_distribution_avg[3]:.1f}%, "
+          f"Main: {exit_distribution_avg[4]:.1f}%")
 
     return exit_ratios, class_correct, class_total, class_exit_distribution
-
 
 def white_board_test(image_path):
     # Load and preprocess a single image for testing
@@ -780,37 +875,70 @@ def white_board_test(image_path):
               f'label: {classified_label.item()} , Exit: {exit_point[0]}')
     plt.show()
 
+
 if __name__ == '__main__':
 
     pl.seed_everything(2024)
-    model, device, trainloader, valloader, testloader = initialize_model()
+    dataset_type = 'cifar100'
+    class_idx = None
+    batch_size = 128
+    num_workers = 4
+    model, device, trainloader, valloader, testloader = initialize_model(
+        dataset_type=dataset_type, class_idx=class_idx,
+        batch_size=batch_size, num_workers=num_workers)
 
-    model = nn.DataParallel(model, device_ids=[0, 1, 2, 3])
+    # model = nn.DataParallel(model, device_ids=[0, 1, 2, 3])
 
     criterion = nn.CrossEntropyLoss()
     learning_rate = 0.0001
     optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=5e-4)
 
+    # TRAIN = True
     TRAIN = False
     if TRAIN:
-        train(50)
+        train(100, dataset_type, class_idx=None)
         test()
     else:
-        model.load_state_dict(torch.load(r"weights/Resnet50/B-Resnet50_epoch_10.pth", weights_only=True))
-        # test()
-        white_board_test("Results/white_board/vgg16/3_cat/white_board_20250405_020418.png")
-        white_board_test("Results/white_board/vgg16/5_dog/white_board_20250404_222037.png")
-        white_board_test("Results/white_board/vgg16/6_frog/white_board_20250406_233829.png")
-        white_board_test("Results/white_board/vgg16/9_truck/white_board_20250405_193221.png")
+        if dataset_type == 'cifar100':
+            model.load_state_dict(torch.load('weights/Resnet50/B-Resnet50_cifar100_coarse.pth', weights_only=True))
+            test()
+        elif dataset_type == 'cifar10':
+            model.load_state_dict(torch.load(r"weights/Resnet50/B-Resnet50_epoch_10.pth", weights_only=True))
+            test()
+
+        # white_board_test("Results/white_board/vgg16/3_cat/white_board_20250405_020418.png")
+        # white_board_test("Results/white_board/vgg16/5_dog/white_board_20250404_222037.png")
+        # white_board_test("Results/white_board/vgg16/6_frog/white_board_20250406_233829.png")
+        # white_board_test("Results/white_board/vgg16/9_truck/white_board_20250405_193221.png")
 
 
     # ee_inference()
+    if dataset_type == 'cifar10':
+        exit_thresholds = [0.3, 0.45, 0.7, 0.05]
+    elif dataset_type == 'cifar100':
+        exit_thresholds = [1.0, 1.1, 1.1, 0.7]
 
     # branch classifier results
-    # threshold_inference_with_class_stats(model, testloader, optimal_thresholds)
+    # threshold_inference_with_class_stats(model, testloader, exit_thresholds, 100)
+    ee_inference(exit_thresholds)
 
+# CIFAR10
 # simple_inference accuracy: [67.39, 76.58, 92.53, 96.4, 96.5]
 # optimal Thresholds already found: [0.3, 0.45, 0.7, 0.05]
 # ---------------------------------
 # threshold_inference Accuracy: [96.51785714285714, 96.8141592920354, 96.57829141173805, 96.84106614017769, 71.83098591549296]
 # threshold_inference Exit Ratios: [22.4, 16.95, 44.13, 10.13, 6.39]
+
+# CIFAR100 90/10 split
+# overall: 80.68%
+# Test Accuracy: [37.70%, 45.16%, 63.51%, 82.76%]
+# -----------------------
+# threshold_inference Accuracy: [82.36%, 82.11%, 84.59%, 82.35%, 27.22%]
+# threshold_inference Exit Ratios: [11.3%, 5.6%, 19.2%, 58.4%, 5.5%]
+
+
+
+
+
+
+
